@@ -1,0 +1,3 @@
+"use client";
+import Link from 'next/link';import {ShoppingCart} from 'lucide-react';import {useEffect,useState} from 'react';import {getCart} from '@/lib/cart';
+export default function CartLink(){const[count,setCount]=useState(0);useEffect(()=>{const update=()=>setCount(getCart().length);update();addEventListener('storage',update);addEventListener('cubixtop-cart',update);return()=>{removeEventListener('storage',update);removeEventListener('cubixtop-cart',update);};},[]);return <Link className="cart-link" href="/cart" aria-label={`Cart with ${count} domains`}><ShoppingCart size={18}/><span>Cart</span>{count>0&&<b>{count}</b>}</Link>}
