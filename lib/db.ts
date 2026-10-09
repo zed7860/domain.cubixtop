@@ -1,5 +1,6 @@
 import { store } from './database-client';
 import type { InValue } from '@libsql/client';
+import { StorageConfigurationError, storageConfiguration } from './storage-config';
 import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -8,8 +9,7 @@ export function verifyPassword(password: string, stored: string) { const [salt, 
 const root = process.env.DATA_DIRECTORY || join(process.cwd(), '.local');
 async function initialize() {
 const db = store;
-if (process.env.VERCEL && (!process.env.ADMIN_PASSWORD || !process.env.SETTINGS_ENCRYPTION_KEY)) throw new Error('ADMIN_PASSWORD and SETTINGS_ENCRYPTION_KEY are required on Vercel.');
-if (process.env.SETTINGS_ENCRYPTION_KEY && !/^[a-fA-F0-9]{64}$/.test(process.env.SETTINGS_ENCRYPTION_KEY)) throw new Error('SETTINGS_ENCRYPTION_KEY must be 64 hexadecimal characters.');
+storageConfiguration();
 if (!process.env.TURSO_DATABASE_URL && !process.env.VERCEL) mkdirSync(root, { recursive: true });
 (await db.exec(`PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'customer', created_at TEXT NOT NULL);
@@ -40,6 +40,7 @@ const existingAdmin = (await db.prepare('SELECT id FROM users WHERE email=?').ge
 if (existingAdmin && configuredAdminPassword) {
   (await db.prepare("UPDATE users SET name='Administrator',password=?,role='admin',email_verified=1 WHERE id=?").run(hashPassword(configuredAdminPassword),existingAdmin.id));
 } else if (!existingAdmin) {
+  if((process.env.VERCEL||process.env.TURSO_DATABASE_URL)&&!configuredAdminPassword)throw new StorageConfigurationError('The database is connected, but the first administrator has not been configured. Set ADMIN_EMAIL and ADMIN_PASSWORD in Vercel Production environment variables, then redeploy.','ADMIN_BOOTSTRAP_MISSING');
   const password = configuredAdminPassword || randomBytes(18).toString('base64url');
   const created = (await db.prepare('INSERT OR IGNORE INTO users(id,email,name,password,role,created_at) VALUES (?,?,?,?,?,?)').run(randomUUID(), adminEmail, 'Administrator', hashPassword(password), 'admin', new Date().toISOString()));
   if (!process.env.TURSO_DATABASE_URL && created.changes && !configuredAdminPassword && !existsSync(join(root, 'admin-credentials.txt'))) writeFileSync(join(root, 'admin-credentials.txt'), `Admin login: ${adminEmail}\nPassword: ${password}\nKeep this file private.\n`, { mode: 0o600 });

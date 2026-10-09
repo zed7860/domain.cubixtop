@@ -48,6 +48,8 @@ Signup welcome emails and password-reset emails use these SMTP settings. Passwor
 
 Authentication initialization failures return JSON HTTP 503 and log `Authentication service initialization failed`. Inspect Vercel runtime logs for missing database credentials, invalid encryption keys, and connection errors. DATA_DIRECTORY=/tmp cannot provide persistent hosted storage.
 
+Login initialization depends on the persistent database, not the merchant-settings encryption key. Missing database credentials now return a specific configuration error naming the missing environment variable. An existing administrator can log in without ADMIN_PASSWORD being present; that variable is required when creating the first hosted administrator. SETTINGS_ENCRYPTION_KEY remains required to read or save encrypted payment and registrar settings. Database credentials and the encryption key are private Vercel environment variables and are never committed to GitHub.
+
 Local development without remote database variables retains SQLite and the existing key. Back up both files together. Netlify deployments also require the remote database and stable key, using its Next.js runtime.
 
 References: [Vercel Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), [Turso TypeScript SDK](https://docs.turso.tech/sdk/ts/reference).

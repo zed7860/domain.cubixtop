@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { storageConfiguration } from './storage-config';
 
 const transactions = new AsyncLocalStorage<Transaction>();
 let client: Client | undefined;
@@ -15,14 +16,10 @@ function exclusive<T>(work: () => Promise<T>): Promise<T> {
 }
 function connection() {
   if (client) return client;
-  const url = process.env.TURSO_DATABASE_URL;
-  if (process.env.VERCEL && (!url || !/^(libsql|https):\/\//.test(url))) {
-    throw new Error('Configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN for persistent Vercel storage.');
-  }
-  if (url && !process.env.TURSO_AUTH_TOKEN) throw new Error('TURSO_AUTH_TOKEN is required for the remote database.');
+  const {url,authToken} = storageConfiguration();
   const root = process.env.DATA_DIRECTORY || join(process.cwd(), '.local');
   if (!url) mkdirSync(root, { recursive: true });
-  client = createClient({ url: url || pathToFileURL(join(root, 'domains.sqlite')).href, authToken: process.env.TURSO_AUTH_TOKEN, intMode: 'number' });
+  client = createClient({ url: url || pathToFileURL(join(root, 'domains.sqlite')).href, authToken, intMode: 'number' });
   return client;
 }
 async function execute(sql: string, args: InValue[] = []) {

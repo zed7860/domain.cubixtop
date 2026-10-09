@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { storageConfiguration } from '../lib/storage-config';
 import { db } from '../lib/db';
 
 test('a failed transaction rolls back settings and keeps concurrent requests isolated', async () => {
@@ -29,11 +30,25 @@ test('a failed transaction rolls back settings and keeps concurrent requests iso
   await db.prepare('DELETE FROM settings WHERE key=?').run(key);
 });
 
+test('database configuration ignores unrelated admin and merchant encryption settings',()=>{
+ const keys=['VERCEL','TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','ADMIN_PASSWORD','SETTINGS_ENCRYPTION_KEY'] as const;
+ const original=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+ try{
+  process.env.VERCEL='1';process.env.TURSO_DATABASE_URL='libsql://fixture.example';process.env.TURSO_AUTH_TOKEN='fixture-token';
+  delete process.env.ADMIN_PASSWORD;process.env.SETTINGS_ENCRYPTION_KEY='invalid';
+  expect(storageConfiguration()).toEqual({url:'libsql://fixture.example',authToken:'fixture-token'});
+  delete process.env.TURSO_AUTH_TOKEN;
+  expect(()=>storageConfiguration()).toThrow('TURSO_AUTH_TOKEN');
+  process.env.TURSO_DATABASE_URL='file:/tmp/accounts.sqlite';
+  expect(()=>storageConfiguration()).toThrow('database URL is invalid');
+ }finally{for(const key of keys){if(original[key]===undefined)delete process.env[key];else process.env[key]=original[key];}}
+});
+
 test('Vercel refuses a local database fallback without writing account storage', () => {
   const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
-    import {store} from './lib/database-client.ts';
-    try { await store.prepare('SELECT 1').get(); process.exit(1); }
-    catch (error) { if (!error.message.includes('persistent Vercel storage')) throw error; }
+    import {storageConfiguration} from './lib/storage-config.ts';
+    try { storageConfiguration(); process.exit(1); }
+    catch (error) { if (error.code !== 'DATABASE_NOT_CONFIGURED') throw error; }
   `], { cwd: process.cwd(), env: { ...process.env, VERCEL: '1', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '' }, encoding: 'utf8' });
   expect(child.status, child.stderr).toBe(0);
 });
