@@ -31,12 +31,13 @@ test('a failed transaction rolls back settings and keeps concurrent requests iso
 });
 
 test('database configuration ignores unrelated admin and merchant encryption settings',()=>{
- const keys=['VERCEL','TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','ADMIN_PASSWORD','SETTINGS_ENCRYPTION_KEY'] as const;
+ const keys=['VERCEL','TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','ADMIN_PASSWORD','SETTINGS_ENCRYPTION_KEY','DATABASE_URL','SUPABASE_DB_URL','POSTGRES_URL','NEXT_PUBLIC_SUPABASE_URL'] as const;
  const original=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
  try{
   process.env.VERCEL='1';process.env.TURSO_DATABASE_URL='libsql://fixture.example';process.env.TURSO_AUTH_TOKEN='fixture-token';
+  delete process.env.DATABASE_URL;delete process.env.SUPABASE_DB_URL;delete process.env.POSTGRES_URL;delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.ADMIN_PASSWORD;process.env.SETTINGS_ENCRYPTION_KEY='invalid';
-  expect(storageConfiguration()).toEqual({url:'libsql://fixture.example',authToken:'fixture-token'});
+  expect(storageConfiguration()).toMatchObject({provider:'libsql',url:'libsql://fixture.example',authToken:'fixture-token'});
   delete process.env.TURSO_AUTH_TOKEN;
   expect(()=>storageConfiguration()).toThrow('TURSO_AUTH_TOKEN');
   process.env.TURSO_DATABASE_URL='file:/tmp/accounts.sqlite';
@@ -49,6 +50,6 @@ test('Vercel refuses a local database fallback without writing account storage',
     import {storageConfiguration} from './lib/storage-config.ts';
     try { storageConfiguration(); process.exit(1); }
     catch (error) { if (error.code !== 'DATABASE_NOT_CONFIGURED') throw error; }
-  `], { cwd: process.cwd(), env: { ...process.env, VERCEL: '1', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '' }, encoding: 'utf8' });
+  `], { cwd: process.cwd(), env: { ...process.env, VERCEL: '1', DATABASE_URL:'',SUPABASE_DB_URL:'',POSTGRES_URL:'',NEXT_PUBLIC_SUPABASE_URL:'',SUPABASE_URL:'',TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '' }, encoding: 'utf8' });
   expect(child.status, child.stderr).toBe(0);
 });

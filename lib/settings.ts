@@ -2,13 +2,14 @@ import {createCipheriv,createDecipheriv,randomBytes} from 'node:crypto';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {db} from './db';
+import {storageConfiguration} from './storage-config';
 
 const dataRoot=process.env.DATA_DIRECTORY||join(process.cwd(),'.local');
 const keyPath=join(dataRoot,'settings.key');
 function encryptionKey(){
  const configured=process.env.SETTINGS_ENCRYPTION_KEY;
  if(configured){if(!/^[a-fA-F0-9]{64}$/.test(configured))throw new Error('SETTINGS_ENCRYPTION_KEY must be 64 hexadecimal characters.');return Buffer.from(configured,'hex');}
- if(process.env.VERCEL||process.env.TURSO_DATABASE_URL)throw new Error('SETTINGS_ENCRYPTION_KEY is required for hosted storage.');
+ if(process.env.VERCEL||storageConfiguration().provider!=='local')throw new Error('SETTINGS_ENCRYPTION_KEY is required for hosted storage.');
  mkdirSync(dataRoot,{recursive:true});
  if(!existsSync(keyPath)){try{writeFileSync(keyPath,randomBytes(32),{mode:0o600,flag:'wx'});}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}}
  const key=readFileSync(keyPath);if(key.length!==32)throw new Error('The local settings key must contain 32 bytes.');return key;

@@ -32,15 +32,15 @@ export default async function Admin({searchParams}:{searchParams:Promise<Filters
   const text=(value:unknown)=>typeof value==='string'?value.trim().slice(0,254):'';
   const section=sections.includes(text(filters.section))?text(filters.section):filters.q!==undefined?'customers':'overview';
   const page=Math.max(1,Math.min(1000000,Number.parseInt(text(filters.page)||'1',10)||1));
-  const stats=(await db.prepare(`SELECT COUNT(*) total,COALESCE(SUM(status='active'),0) active,
+  const stats=(await db.prepare(`SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN status='active' THEN 1 ELSE 0 END),0) active,
     COALESCE(SUM(CASE WHEN status='active' THEN amount_inr ELSE 0 END),0) active_value,
-    COALESCE(SUM(status='payment_pending' OR status='pending_payment'),0) pending,
-    COALESCE(SUM(status IN ('manual_review','payment_failed') OR (failure_reason IS NOT NULL AND status!='sandbox_paid')),0) review FROM checkouts WHERE status!='cancelled'`).get()) as {total:number;active:number;active_value:number;pending:number;review:number};
-  const customers=(await db.prepare("SELECT COUNT(*) total,COALESCE(SUM(email_verified=0),0) unverified FROM users WHERE role='customer'").get()) as {total:number;unverified:number};
+    COALESCE(SUM(CASE WHEN status='payment_pending' OR status='pending_payment' THEN 1 ELSE 0 END),0) pending,
+    COALESCE(SUM(CASE WHEN status IN ('manual_review','payment_failed') OR (failure_reason IS NOT NULL AND status!='sandbox_paid') THEN 1 ELSE 0 END),0) review FROM checkouts WHERE status!='cancelled'`).get()) as {total:number;active:number;active_value:number;pending:number;review:number};
+  const customers=(await db.prepare("SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN email_verified=0 THEN 1 ELSE 0 END),0) unverified FROM users WHERE role='customer'").get()) as {total:number;unverified:number};
   const payment=(await publicPaymentSettings()),registrar=(await getRegistrarSettings());
   const metrics=[['Registered customers',customers.total,'All customer accounts',Users,'customers'],['Active domains',stats.active,'Confirmed registrations',Globe2,'orders'],['Active order value',new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(stats.active_value),'Order totals · before costs',Wallet,'payments'],['Needs attention',stats.review,'Failed or review required',CircleAlert,'review']] as const;
   const days=Array.from({length:7},(_,index)=>new Date(Date.now()-(6-index)*86400000).toISOString().slice(0,10));
-  const daily=(await db.prepare('SELECT substr(created_at,1,10) day,COUNT(*) total FROM checkouts WHERE created_at>=? AND status!=\'cancelled\' GROUP BY day').all(days[0])) as {day:string;total:number}[];
+  const daily=(await db.prepare('SELECT substr(created_at,1,10) AS "day",COUNT(*) total FROM checkouts WHERE created_at>=? AND status!=\'cancelled\' GROUP BY "day"').all(days[0])) as {day:string;total:number}[];
   const bars=days.map(day=>({day,total:daily.find(row=>row.day===day)?.total||0})),max=Math.max(1,...bars.map(bar=>bar.total));
   const recent=(await db.prepare('SELECT c.domain,c.user_id,c.status,c.updated_at,u.email FROM checkouts c JOIN users u ON u.id=c.user_id WHERE c.status!=\'cancelled\' ORDER BY c.updated_at DESC LIMIT 5').all()) as {domain:string;user_id:string;status:string;updated_at:string;email:string}[];
   return <main className="admin-page"><div className="admin-page-top"><div><span className="eyebrow">WORKSPACE / {section.toUpperCase()}</span><h1>{titles[section][0]}</h1><p className="muted">{titles[section][1]}</p></div><div className="admin-top-actions"><span className="badge"><ShieldCheck size={13}/> Admin access</span><AdminRefresh/></div></div>

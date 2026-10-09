@@ -1,6 +1,7 @@
 import { store } from './database-client';
 import type { InValue } from '@libsql/client';
 import { StorageConfigurationError, storageConfiguration } from './storage-config';
+import { postgresSchema } from './postgres-schema';
 import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -9,8 +10,11 @@ export function verifyPassword(password: string, stored: string) { const [salt, 
 const root = process.env.DATA_DIRECTORY || join(process.cwd(), '.local');
 async function initialize() {
 const db = store;
-storageConfiguration();
-if (!process.env.TURSO_DATABASE_URL && !process.env.VERCEL) mkdirSync(root, { recursive: true });
+const configuration=storageConfiguration();
+if(configuration.provider==='postgres'){
+ await db.transaction(async()=>{await db.exec('SELECT pg_advisory_xact_lock(7860001)');await db.exec(postgresSchema);});
+}else{
+if (configuration.provider==='local'&&!process.env.VERCEL) mkdirSync(root, { recursive: true });
 (await db.exec(`PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'customer', created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires INTEGER NOT NULL);
@@ -34,15 +38,16 @@ for (const name of ['phone','address','city','state','postal_code','country']) i
 }
 const checkoutColumns=(await db.prepare('PRAGMA table_info(checkouts)').all()) as {name:string}[];
 for(const [name,type] of [['cashfree_order_id','TEXT'],['payment_session_id','TEXT'],['amount_inr','REAL'],['contact','TEXT'],['registrar_reference','TEXT'],['failure_reason','TEXT']] as const)if(!checkoutColumns.some(column=>column.name===name))try{(await db.exec(`ALTER TABLE checkouts ADD COLUMN ${name} ${type}`));}catch(error){if(!(error instanceof Error)||!error.message.includes('duplicate column'))throw error;}
+}
 const adminEmail = (process.env.ADMIN_EMAIL || 'admin@cubixtop.com').trim().toLowerCase();
 const configuredAdminPassword = process.env.ADMIN_PASSWORD;
 const existingAdmin = (await db.prepare('SELECT id FROM users WHERE email=?').get(adminEmail)) as {id:string}|undefined;
 if (existingAdmin && configuredAdminPassword) {
   (await db.prepare("UPDATE users SET name='Administrator',password=?,role='admin',email_verified=1 WHERE id=?").run(hashPassword(configuredAdminPassword),existingAdmin.id));
 } else if (!existingAdmin) {
-  if((process.env.VERCEL||process.env.TURSO_DATABASE_URL)&&!configuredAdminPassword)throw new StorageConfigurationError('The database is connected, but the first administrator has not been configured. Set ADMIN_EMAIL and ADMIN_PASSWORD in Vercel Production environment variables, then redeploy.','ADMIN_BOOTSTRAP_MISSING');
+  if((process.env.VERCEL||configuration.provider!=='local')&&!configuredAdminPassword)throw new StorageConfigurationError('The database is connected, but the first administrator has not been configured. Set ADMIN_EMAIL and ADMIN_PASSWORD in Vercel Production environment variables, then redeploy.','ADMIN_BOOTSTRAP_MISSING');
   const password = configuredAdminPassword || randomBytes(18).toString('base64url');
-  const created = (await db.prepare('INSERT OR IGNORE INTO users(id,email,name,password,role,created_at) VALUES (?,?,?,?,?,?)').run(randomUUID(), adminEmail, 'Administrator', hashPassword(password), 'admin', new Date().toISOString()));
+  const created = (await db.prepare('INSERT INTO users(id,email,name,password,role,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(email) DO NOTHING').run(randomUUID(), adminEmail, 'Administrator', hashPassword(password), 'admin', new Date().toISOString()));
   if (!process.env.TURSO_DATABASE_URL && created.changes && !configuredAdminPassword && !existsSync(join(root, 'admin-credentials.txt'))) writeFileSync(join(root, 'admin-credentials.txt'), `Admin login: ${adminEmail}\nPassword: ${password}\nKeep this file private.\n`, { mode: 0o600 });
 }
 }

@@ -18,7 +18,7 @@ New customers receive a personalized **Welcome to Cubixtop Domain** email at the
 
 ## Run
 
-Requires Node.js 24. Local development uses SQLite; Vercel uses remote libSQL storage.
+Requires Node.js 24. Local development uses SQLite; Vercel uses Supabase PostgreSQL through DATABASE_URL.
 
 ```powershell
 npm install
@@ -83,7 +83,7 @@ Missing email settings disable email delivery. Merchant activation, real credent
 
 ## Storage and deployment
 
-Deploy on Vercel using TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and a stable SETTINGS_ENCRYPTION_KEY. See DEPLOYMENT.md for setup and existing-data migration. For local development or a persistent single server, SQLite is stored in DATA_DIRECTORY/domains.sqlite and the fallback key in DATA_DIRECTORY/settings.key. Back up both files together.
+Deploy on Vercel using Supabase DATABASE_URL and a stable SETTINGS_ENCRYPTION_KEY. See DEPLOYMENT.md for setup and existing-data migration. For local development or a persistent single server, SQLite is stored in DATA_DIRECTORY/domains.sqlite and the fallback key in DATA_DIRECTORY/settings.key. Back up both files together.
 
 Point the website domain at your server, terminate HTTPS and expose the notification routes publicly. Merchant callbacks cannot reach localhost. Set up private backups and keep the data directory outside publicly served files. Accounts with payment records need support-assisted closure so payment and registration records are not lost.
 

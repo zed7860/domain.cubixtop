@@ -1,55 +1,31 @@
-# Deploy to Vercel
+# Supabase and Vercel deployment
 
-The app uses Next.js with a persistent remote libSQL database on Vercel. Local development continues to use `.local/domains.sqlite`. Hosted requests never fall back to temporary SQLite storage.
+This application supports Supabase PostgreSQL through a server-only DATABASE_URL. The Supabase URL and API keys alone do not provide a PostgreSQL connection or database password. Local tests use isolated SQLite and an embedded PostgreSQL test engine, never the production database.
 
-## Required environment variables
+## Production environment upload
 
-Create a **libSQL** database in Turso. Use a separate database for previews. Set these variables in the Vercel project before deployment:
+1. In Supabase, open your project and click **Connect > Transaction pooler**. Copy the PostgreSQL connection string. Replace [YOUR-PASSWORD] with your database password and URL-encode reserved password characters. Use the supplied host, port and username exactly.
+2. Put that string in DATABASE_URL in `.env.local`, then run `npm run export:vercel-env`. This creates the private `.env.vercel` upload file with your existing Supabase, Zoho and admin credentials. It also preserves the original local settings encryption key when available.
+3. Import `.env.vercel` into your Vercel project's **Production** environment. Review the new settings before removing old ones. Never upload this file to GitHub or commit it. The source ZIP excludes private environment files.
+4. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY` from Supabase Project Settings. Use NEXT_PUBLIC_SITE_URL=https://domain.cubixtop.com and COOKIE_SECURE=true. Ensure ADMIN_EMAIL and ADMIN_PASSWORD match the intended administrator login. SETTINGS_ENCRYPTION_KEY must be a stable 64-character hexadecimal secret; keep a private backup.
+5. Use Next.js, Node.js 24, npm ci and npm run build in Vercel, then redeploy. A GitHub push does not upload local secrets into Vercel.
 
-| Variable | Value |
-| --- | --- |
-| TURSO_DATABASE_URL | Your libsql:// database URL |
-| TURSO_AUTH_TOKEN | Private database token |
-| SETTINGS_ENCRYPTION_KEY | One stable 64-character hexadecimal secret |
-| ADMIN_EMAIL | Administrator email |
-| ADMIN_PASSWORD | Strong password, at least 12 characters |
-| NEXT_PUBLIC_SITE_URL | Public HTTPS website URL |
-| COOKIE_SECURE | true |
+The app creates its business-data tables in the private **cubixtop** PostgreSQL schema on first startup. Customer signup, sign-in, email verification and password recovery use Supabase Auth. A private customer row is mirrored for orders and profiles, while the administrator authenticates only against `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The service-role key is used only in server routes and must never be exposed or prefixed with `NEXT_PUBLIC_`.
 
-Generate a new encryption key locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately and keep the same key across deployments. Losing it makes saved merchant credentials unreadable. Add SMTP and optional NAMESILO_API_KEY values from `.env.example`. Configure merchants and registrar settings in Admin > Integrations.
+## Zoho email
 
-The app creates its runtime tables on first database access. The older `supabase/schema.sql` describes a different data model and is not used by this application.
+Configure Supabase Auth email templates and add `https://domain.cubixtop.com/verify` and `https://domain.cubixtop.com/reset-password` to the Auth redirect allow list. Supabase sends customer verification and reset messages. The Zoho SMTP settings remain available for application emails; `npm run verify:email` checks that connection without sending a message.
 
-## Upload and deploy
+## Preserve local accounts and integration settings
 
-Import the source into Vercel with the **Next.js** preset and **Node.js 24.x**. Select the folder containing package.json as the root. vercel.json uses npm ci and npm run build; leave the output directory at its framework default.
+Existing SQLite records are not automatically imported into a new Supabase schema. Back up .local/domains.sqlite and .local/settings.key, configure DATABASE_URL, then run `npm run migrate:supabase`. Business records and private settings are preserved, but old application password hashes cannot be used by Supabase Auth. Create or invite those customers in Supabase Auth before launch, or have them use Supabase password recovery. Preserve the original SETTINGS_ENCRYPTION_KEY.
 
-Generate `cubixtop-vercel.zip` with `npm run package:vercel`. The archive contains source and the lockfile, and excludes node_modules, .next, .local, .env.local, logs, and test results. If your import workflow requires a repository, commit the archive's source contents to a repository and import that repository.
+## Checks and troubleshooting
 
-Check login, account creation, admin access, and saved settings across requests and redeployments. Confirm registrar outbound-IP requirements. Configure gateway callbacks using the public website URL and complete sandbox checkout and signed notification checks before using production payments. Automated payments use fixtures and do not prove merchant activation or live registration.
+Run `npm run check:deployment`, `npm run typecheck`, `npm run build` and `npm test`. PostgreSQL tests exercise real PostgreSQL SQL semantics, login, profiles, orders and admin pages against an isolated engine. Merchant tests use fixtures and do not purchase domains or make real charges.
 
-## Preserve existing accounts and settings
+Missing DATABASE_URL produces SUPABASE_CONNECTION_MISSING. Missing first-administrator credentials produce ADMIN_BOOTSTRAP_MISSING. For invalid credentials, certificate errors or connection timeouts, inspect Vercel runtime logs following Authentication service initialization failed. PostgreSQL certificates are verified; the code does not disable TLS checks. Login does not require the merchant-settings encryption key, but encrypted integration settings do.
 
-Stop local writes and back up `.local/domains.sqlite` and `.local/settings.key`. Import the SQLite database into an empty remote **libSQL** database using Turso's SQLite import workflow. This preserves runtime tables, accounts, orders, and encrypted payment snapshots. Do not apply supabase/schema.sql over it.
+Use a separate database for preview deployments. Configure payment callbacks and verify sandbox payment-to-registration behavior before enabling production merchants. DATA_DIRECTORY=/tmp is not persistent hosted storage.
 
-Set SETTINGS_ENCRYPTION_KEY to the **hexadecimal encoding of the original settings.key file**, rather than generating a replacement. Keep it private. Verify imported records and decrypted integrations before changing the production URL. No remote database has been provisioned and no existing records have been uploaded automatically.
-
-## Troubleshooting
-
-### GitHub automatic deployment and Zoho email
-
-Push this project's source to the GitHub repository already connected to your Vercel project. Vercel must track the branch you push. Keep the Next.js preset, Node.js 24, `npm ci` install and `npm run build` build commands.
-
-The verified local Zoho SMTP host for info@cubixtop.com is **smtp.zoho.in**, using port **587**, `SMTP_SECURE=false`, and required STARTTLS. Set SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD and EMAIL_FROM in **Vercel's environment variables**. The updated local app password remains in the ignored `.env.local`; GitHub pushes do not copy it into Vercel. If changing the Zoho account or plan, use the host shown in that mailbox's Server Configuration Details.
-
-Run `npm run verify:email` to verify SMTP authentication without sending mail. Run `npm run check:deployment` to identify missing hosted configuration. The remote database variables TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and SETTINGS_ENCRYPTION_KEY still need to be supplied in Vercel if not already configured there. Redeploy after changing Vercel environment variables.
-
-Signup welcome emails and password-reset emails use these SMTP settings. Password reset links expire in two hours and become invalid after a successful reset. Set NEXT_PUBLIC_SITE_URL to the actual HTTPS production domain so email links point to the deployed application. The email-flow test runs an isolated server with a captured mailbox and verifies the signup message, browser recovery flow, expiry, token replacement, single use, concurrent submissions, session revocation and delivery failure. It sends no real emails.
-
-Authentication initialization failures return JSON HTTP 503 and log `Authentication service initialization failed`. Inspect Vercel runtime logs for missing database credentials, invalid encryption keys, and connection errors. DATA_DIRECTORY=/tmp cannot provide persistent hosted storage.
-
-Login initialization depends on the persistent database, not the merchant-settings encryption key. Missing database credentials now return a specific configuration error naming the missing environment variable. An existing administrator can log in without ADMIN_PASSWORD being present; that variable is required when creating the first hosted administrator. SETTINGS_ENCRYPTION_KEY remains required to read or save encrypted payment and registrar settings. Database credentials and the encryption key are private Vercel environment variables and are never committed to GitHub.
-
-Local development without remote database variables retains SQLite and the existing key. Back up both files together. Netlify deployments also require the remote database and stable key, using its Next.js runtime.
-
-References: [Vercel Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), [Turso TypeScript SDK](https://docs.turso.tech/sdk/ts/reference).
+References: [Supabase PostgreSQL connections](https://supabase.com/docs/guides/database/connecting-to-postgres), [Vercel Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).

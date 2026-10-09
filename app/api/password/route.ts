@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { db, hashPassword } from '@/lib/db';
 import { checkOrigin, errorResponse, HttpError, newAuthToken, PASSWORD_RESET_TTL_MS, rateLimit, tokenHash } from '@/lib/auth';
 import { emailReady, sendCubixtopEmail } from '@/lib/email';
+import { supabaseAuth, supabaseAuthEnabled } from '@/lib/supabase-auth';
 export const runtime='nodejs';
 const emailSchema=z.email().max(254);
 export async function POST(req:Request){
@@ -13,6 +14,12 @@ export async function POST(req:Request){
   if(body.action==='request'){
    const parsed=emailSchema.safeParse(typeof body.email==='string'?body.email.trim().toLowerCase():body.email);
    if(!parsed.success)throw new HttpError('Enter a valid email address.');
+   if(supabaseAuthEnabled()){
+    const base=(process.env.NEXT_PUBLIC_SITE_URL||new URL(req.url).origin).replace(/\/$/,'');
+    const {error}=await supabaseAuth().auth.resetPasswordForEmail(parsed.data,{redirectTo:`${base}/reset-password`});
+    if(error)throw new HttpError('The reset email could not be sent. Please try again later.',502);
+    return Response.json({ok:true,message:'If an account exists for this email, a password reset link has been sent. Check your inbox and spam folder.'});
+   }
    if(!emailReady())throw new HttpError('Email delivery is temporarily unavailable. Please contact support.',503);
    const user=await db.prepare('SELECT id,email FROM users WHERE email=?').get(parsed.data) as {id:string;email:string}|undefined;
    if(user){
