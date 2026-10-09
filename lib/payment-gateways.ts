@@ -5,16 +5,16 @@ import {createCashfreeOrder,getCashfreeOrder,validateCashfreeSettings} from './c
 import {getCashfreeSettings,readPrivateSetting,writePrivateSetting} from './settings';
 import {paymentCatalog,type PaymentConfig,type PaymentLaunch,type PaymentProvider} from './payment-catalog';
 
-export function getPaymentConfig(provider?:PaymentProvider):PaymentConfig|null {
-  const active=readPrivateSetting<PaymentProvider>('payment-active');
+export async function getPaymentConfig(provider?:PaymentProvider):Promise<PaymentConfig|null> {
+  const active=(await readPrivateSetting<PaymentProvider>('payment-active'));
   const selected=provider||active||'cashfree';
-  const saved=readPrivateSetting<PaymentConfig>('payment-'+selected);
+  const saved=(await readPrivateSetting<PaymentConfig>('payment-'+selected));
   if(saved)return saved;
-  if(selected==='cashfree'){const legacy=getCashfreeSettings();if(legacy)return {provider:selected,environment:legacy.environment,credentials:{appId:legacy.appId,secretKey:legacy.secretKey}};}
+  if(selected==='cashfree'){const legacy=(await getCashfreeSettings());if(legacy)return {provider:selected,environment:legacy.environment,credentials:{appId:legacy.appId,secretKey:legacy.secretKey}};}
   return null;
 }
-export function savePaymentConfig(config:PaymentConfig){writePrivateSetting('payment-'+config.provider,config);writePrivateSetting('payment-active',config.provider);}
-export function publicPaymentSettings(){return {active:getPaymentConfig()?.provider||null,gateways:Object.keys(paymentCatalog).map(key=>{const provider=key as PaymentProvider,config=getPaymentConfig(provider);return {provider,configured:Boolean(config),environment:config?.environment||'sandbox',verified:config?.connection?.verified===true,verifiedAt:config?.connection?.verified?config.connection.checkedAt:null,verificationScope:config?.connection?.scope||null};})};}
+export async function savePaymentConfig(config:PaymentConfig){(await writePrivateSetting('payment-'+config.provider,config));(await writePrivateSetting('payment-active',config.provider));}
+export async function publicPaymentSettings(){return {active:(await getPaymentConfig())?.provider||null,gateways:await Promise.all(Object.keys(paymentCatalog).map(async key=>{const provider=key as PaymentProvider,config=(await getPaymentConfig(provider));return {provider,configured:Boolean(config),environment:config?.environment||'sandbox',verified:config?.connection?.verified===true,verifiedAt:config?.connection?.verified?config.connection.checkedAt:null,verificationScope:config?.connection?.scope||null};}))};}
 export const sha512=(value:string)=>createHash('sha512').update(value).digest('hex');
 export function equalSignature(expected:string,received:string){const a=Buffer.from(expected),b=Buffer.from(received);return a.length===b.length&&timingSafeEqual(a,b);}
 export function razorpaySignature(orderId:string,paymentId:string,signature:string,secret:string){return equalSignature(createHmac('sha256',secret).update(orderId+'|'+paymentId).digest('hex'),signature);}
@@ -34,7 +34,7 @@ export async function validatePaymentConfig(c:PaymentConfig):Promise<{verified:b
   return {verified:false,message:'Settings saved — connection verification pending. Complete a sandbox payment to verify the merchant key and salt before going live.'};
 }
 function credentialFingerprint(c:PaymentConfig){return createHash('sha256').update(JSON.stringify([c.provider,c.environment,Object.entries(c.credentials).sort(([a],[b])=>a.localeCompare(b))])).digest('hex');}
-export function recordVerifiedPaymentConnection(c:PaymentConfig){const current=getPaymentConfig(c.provider);if(!current||credentialFingerprint(current)!==credentialFingerprint(c))return;writePrivateSetting('payment-'+c.provider,{...current,connection:{verified:true,checkedAt:new Date().toISOString(),scope:'payment'}});}
+export async function recordVerifiedPaymentConnection(c:PaymentConfig){const current=(await getPaymentConfig(c.provider));if(!current||credentialFingerprint(current)!==credentialFingerprint(c))return;(await writePrivateSetting('payment-'+c.provider,{...current,connection:{verified:true,checkedAt:new Date().toISOString(),scope:'payment'}}));}
 export type PaymentInput={orderId:string;amount:number;customerId:string;name:string;firstName:string;email:string;phone:string;domain:string};
 export async function createPayment(c:PaymentConfig,input:PaymentInput):Promise<PaymentLaunch>{
  const launch:PaymentLaunch={provider:c.provider,orderId:input.orderId,amount:input.amount,currency:'INR',mode:c.environment};

@@ -1,0 +1,106 @@
+/* Shared storefront and workspace finish; the font ships with the app. */
+:root{--bg:#fff;--line:#dce3d5;--text:#202321;--muted:#626d63;--brand:#b44400;--blue:#ca4d00;--soft:#f4f4ef;--shadow:0 8px 32px rgb(10 33 16 / 5%)}
+html[data-theme="dark"]{--bg:#101c16;--card:#192b21;--line:#354a3c;--text:#f4f4ef;--muted:#c0cabf;--brand:#ff9954;--blue:#ff9954;--soft:#21352a}
+body{font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3{font-weight:800;text-wrap:balance}
+.hero h1{letter-spacing:-.055em;line-height:1.12}
+.hero p{font-size:17px;line-height:1.85}
+.title{letter-spacing:-.04em}
+.links a{font-weight:650}
+.btn,.btn2{border-radius:12px;min-height:46px;padding:12px 22px;font-weight:750;letter-spacing:-.015em;transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease}
+.btn{background:linear-gradient(135deg,#ed651a,#df570b);border-color:#df570b;color:#fff;box-shadow:0 4px 10px rgb(202 77 0 / 20%),inset 0 1px 0 rgb(255 255 255 / 18%)}
+.btn:hover{background:linear-gradient(135deg,#cf4e08,#bc4200);box-shadow:0 7px 18px rgb(202 77 0 / 28%);transform:translateY(-2px)}
+.btn2{background:var(--card);border-color:var(--line);box-shadow:0 2px 4px rgb(10 33 16 / 4%)}
+.btn2:hover{background:var(--soft);border-color:var(--brand);transform:translateY(-2px)}
+.btn:active,.btn2:active{transform:translateY(0);box-shadow:none}
+.btn:disabled,.btn2:disabled,.extension:disabled{transform:none;box-shadow:none;opacity:.55}
+.btn svg,.btn2 svg{flex-shrink:0}
+.links a.btn,.links a.btn:hover{color:#fff}
+.theme-toggle{transition:background .18s ease,transform .18s ease}
+.theme-toggle:hover{background:var(--line);transform:rotate(8deg)}
+.hero{background:radial-gradient(ellipse at 80% 20%,rgb(250 100 0 / 14%),transparent 50%),linear-gradient(135deg,var(--soft),var(--bg));border-bottom:1px solid var(--line)}
+.badge{padding:8px 14px}
+.search{border-radius:16px;padding:9px;box-shadow:0 10px 36px rgb(10 33 16 / 9%)}
+.search .btn{padding-left:18px;padding-right:18px}
+.search input{font-weight:550}
+.search input::placeholder{color:var(--muted);opacity:.85}
+.currency-toggle{border-radius:10px}
+.currency-toggle button{border-radius:7px;font-size:12px;font-weight:700}
+.currency-toggle button:not(.active):hover{background:var(--soft);color:var(--text)}
+.card{border-radius:18px}
+.extension{position:relative;overflow:hidden}
+.extension::after{content:'';position:absolute;width:110px;height:110px;border-radius:50%;background:var(--soft);right:-45px;bottom:-50px;pointer-events:none}
+.extension:hover{box-shadow:0 14px 30px rgb(10 33 16 / 10%)}
+.extension span{font-weight:700}
+.extension h3{letter-spacing:-.05em}
+.feature-band{border-radius:20px}
+.form input,.form select,.form textarea,.cart-summary select,.user-search input{border-radius:10px;min-height:46px;transition:border-color .18s ease,box-shadow .18s ease}
+.form input:hover,.form select:hover,.form textarea:hover{border-color:var(--muted)}
+.form input:focus,.form select:focus,.form textarea:focus{border-color:var(--brand)}
+.form label{font-weight:650}
+.form .check-label input{min-height:0}
+.tabs{border-radius:12px}
+.tabs button{border-radius:9px;font-weight:700}
+.tabs button:not(.selected):hover{color:var(--text)}
+.auth-card{box-shadow:0 16px 50px rgb(10 33 16 / 8%)}
+.quiet-button:hover{color:var(--brand)}
+.remove-button:hover{text-decoration:underline}
+.notice{border-radius:12px}
+.price,.kpi,.metric-card>strong{font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+@media(max-width:640px){.hero p{font-size:16px}.search{gap:4px}.search .btn{margin-top:4px}.btn,.btn2{padding:11px 17px}}
+@media(prefers-reduced-motion:reduce){.btn:hover,.btn2:hover,.extension:hover,.theme-toggle:hover{transform:none}}
+
+/* Cubixtop's green, cream and orange navigation and editorial styling. */
+.site-header{background:#12221b;border-bottom:1px solid #ffffff1a;color:#fff}
+.nav{min-height:100px;gap:20px}
+.brand img{filter:brightness(0) invert(1);width:175px;height:64px}
+.brand span{color:#d4dfd0;border-color:#ffffff30}
+.links{gap:14px}
+.links>a:not(.btn):not(.btn2){color:#e0e8df;padding:8px 0}
+.links>a[aria-current="page"]:not(.btn){color:#ff9954}
+.links>a:not(.btn):hover{color:#ff9954}
+.links .btn{border-radius:50px;min-height:44px}
+.links .btn2{background:transparent;color:#fff;border-color:#ffffff40;font-size:12px;white-space:nowrap}
+.links .btn2:hover{background:#ffffff10;color:#ff9954;border-color:#ff9954}
+.links .web-development{margin-left:4px}
+.links .theme-toggle{background:#ffffff0c;border-color:#ffffff26;color:#ff9954}
+.hamburger-control{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:8px 4px;background:none;border:0;color:#fff;font-size:12px}
+.hamburger-lines{display:flex;flex-direction:column;gap:6px;width:24px}
+.hamburger-lines i{display:block;width:24px;height:2px;background:currentColor;transition:width .2s}
+.hamburger-lines i:last-child{width:16px;align-self:flex-end}
+.hamburger-control:hover .hamburger-lines i:last-child{width:24px}
+.navigation-dialog{position:fixed;inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:32px max(24px,calc((100vw - 1152px)/2));border:0;background:#12221b;color:#fff;overflow:auto}
+.navigation-dialog::backdrop{background:#12221b}
+.navigation-top{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid #ffffff20;padding-bottom:24px}
+.navigation-top>span{font-size:12px;letter-spacing:.12em;color:#d4dfd0}
+.navigation-close{display:flex;align-items:center;gap:12px;background:none;border:0;color:#fff;padding:10px;font-size:13px}
+.navigation-dialog nav{max-width:900px;margin:32px 0}
+.navigation-dialog nav a{display:grid;grid-template-columns:32px minmax(0,1fr) 28px;align-items:center;gap:20px;border-bottom:1px solid #ffffff22;padding:18px 0}
+.navigation-dialog nav small{color:#b1bfb1;font-size:11px}
+.navigation-dialog nav span{font-size:clamp(26px,4.5vw,52px);letter-spacing:-.04em;line-height:1.2}
+.navigation-dialog nav a:hover,.navigation-dialog nav a[aria-current="page"]{color:#ff9954}
+.navigation-footer{display:flex;justify-content:space-between;align-items:center;gap:24px;border-top:1px solid #ffffff20;padding-top:20px;color:#c0cabf;font-size:14px}
+.hero{background:radial-gradient(ellipse at 80% 30%,#39543c80,transparent 55%),linear-gradient(125deg,#12221b,#1c3425);color:#f4f4ef;border-bottom:0}
+.hero h1{font-weight:500;letter-spacing:-.055em}
+.hero h1 span{color:#ff9954}
+.hero p,.hero .search-note,.hero .search-tools{color:#cbd7ca}
+.hero .badge{background:#ffffff0a;border-color:#ffffff26;color:#ff9954}
+.hero .search{background:var(--card);color:var(--text)}
+.hero .search-results,.hero>div[aria-live]{color:var(--text)}
+.hero .result .muted{color:var(--muted)}
+.hero-art .orbit{border-color:#ff995450}
+.hero-art .orbit:after{border-color:#ff995430}
+.server-unit{box-shadow:12px 16px 0 #fa64001c}
+.section-heading h2,.feature-band h2,.prose h1{font-weight:500}
+.feature-band{background:var(--soft)}
+.footer{background:#f0f1eb;color:#626d63;border-top:1px solid #dce3d5}
+.footer-columns h3{color:#202321}
+.footer-company img{filter:none}
+.footer-list a:hover,.footer-legal a:hover{color:#b44400}
+.footer-bottom{border-color:#cbd0c6}
+html[data-theme="dark"] .footer{background:#12221b;color:#c0cabf;border-color:#354a3c}
+html[data-theme="dark"] .footer-columns h3{color:#f4f4ef}
+html[data-theme="dark"] .footer-company img{filter:brightness(0) invert(1)}
+html[data-theme="dark"] .footer-list a:hover,html[data-theme="dark"] .footer-legal a:hover{color:#ff9954}
+@media(max-width:1100px){.nav{flex-wrap:wrap;justify-content:center;padding:14px 0;gap:8px}.links{justify-content:center;gap:12px}.brand span{display:none}}
+@media(max-width:640px){.nav{min-height:88px}.brand img{height:44px;width:150px}.links{gap:6px 12px}.links .btn2{padding:8px 12px}.links .web-development{margin-left:0}.navigation-dialog{padding:20px}.navigation-dialog nav{margin:24px 0}.navigation-dialog nav a{gap:12px;padding:18px 0}.navigation-footer{flex-direction:column;align-items:flex-start}.navigation-top>span{font-size:10px}.hero h1{font-size:40px}}

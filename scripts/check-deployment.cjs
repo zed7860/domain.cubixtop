@@ -1,0 +1,13 @@
+const required = ['TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','SETTINGS_ENCRYPTION_KEY','ADMIN_EMAIL','ADMIN_PASSWORD','NEXT_PUBLIC_SITE_URL','SMTP_HOST','SMTP_USER','SMTP_PASSWORD'];
+const missing = required.filter(key => !process.env[key]?.trim());
+const issues = [];
+if (process.env.TURSO_DATABASE_URL && !/^(libsql|https):\/\//.test(process.env.TURSO_DATABASE_URL)) issues.push('TURSO_DATABASE_URL must reference a remote libSQL database.');
+if (process.env.SETTINGS_ENCRYPTION_KEY && !/^[a-f\d]{64}$/i.test(process.env.SETTINGS_ENCRYPTION_KEY)) issues.push('SETTINGS_ENCRYPTION_KEY must contain 64 hexadecimal characters.');
+if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length < 12) issues.push('ADMIN_PASSWORD must contain at least 12 characters.');
+if (process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.startsWith('https://')) issues.push('NEXT_PUBLIC_SITE_URL must use HTTPS.');
+if (process.env.COOKIE_SECURE !== 'true') issues.push('Set COOKIE_SECURE=true on Vercel.');
+if (process.env.SMTP_PORT === '465' && process.env.SMTP_SECURE !== 'true') issues.push('SMTP port 465 requires SMTP_SECURE=true.');
+if (missing.length) console.error('Missing deployment variables: '+missing.join(', '));
+issues.forEach(issue => console.error(issue));
+if (missing.length || issues.length) process.exitCode = 1;
+else console.log('Required deployment variables are configured. This checks values, not remote service connectivity.');

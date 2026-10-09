@@ -60,25 +60,25 @@ test('sandbox success, amount mismatch, immutable credentials and concurrent del
  const userId=randomUUID(),orderId=randomUUID(),attemptId='cubix_'+randomUUID().replaceAll('-',''),key='test-config-'+attemptId;
  const now=new Date().toISOString(),originalRegister=NameSiloRegistrar.prototype.register;
  let registrations=0;NameSiloRegistrar.prototype.register=async()=>{registrations++;return {reference:'fixture-registration',code:300,amount:10};};
- db.prepare('INSERT INTO users(id,email,name,password,created_at) VALUES(?,?,?,?,?)').run(userId,userId+'@example.invalid','Test','unused',now);
- db.prepare('INSERT INTO checkouts(id,user_id,domain,status,amount_inr,contact,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(orderId,userId,orderId+'.com','payment_pending',123.45,'{}',now,now);
- writePrivateSetting(key,config('cashfree'));
- db.prepare('INSERT INTO payment_attempts(id,checkout_id,provider,config_key,gateway_order_id,amount_inr,created_at) VALUES(?,?,?,?,?,?,?)').run(attemptId,orderId,'cashfree',key,attemptId,123.45,now);
- const order=()=>db.prepare('SELECT * FROM checkouts WHERE id=?').get(orderId) as Checkout,attempt=db.prepare('SELECT * FROM payment_attempts WHERE id=?').get(attemptId) as PaymentAttempt;
+ (await db.prepare('INSERT INTO users(id,email,name,password,created_at) VALUES(?,?,?,?,?)').run(userId,userId+'@example.invalid','Test','unused',now));
+ (await db.prepare('INSERT INTO checkouts(id,user_id,domain,status,amount_inr,contact,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(orderId,userId,orderId+'.com','payment_pending',123.45,'{}',now,now));
+ (await writePrivateSetting(key,config('cashfree')));
+ (await db.prepare('INSERT INTO payment_attempts(id,checkout_id,provider,config_key,gateway_order_id,amount_inr,created_at) VALUES(?,?,?,?,?,?,?)').run(attemptId,orderId,'cashfree',key,attemptId,123.45,now));
+ const order=async ()=>(await db.prepare('SELECT * FROM checkouts WHERE id=?').get(orderId)) as Checkout,attempt=(await db.prepare('SELECT * FROM payment_attempts WHERE id=?').get(attemptId)) as PaymentAttempt;
  try{
-  const stored=db.prepare('SELECT value FROM settings WHERE key=?').get(key) as {value:string};expect(stored.value).not.toContain('fixture-secret');expect(attemptConfig(attempt).credentials.secretKey).toBe('fixture-secret');
-  expect(JSON.stringify(publicPaymentSettings())).not.toContain('fixture-secret');
-  await settleCheckout(order(),{status:'PAID',amount:1,currency:'INR'},attempt);expect(order().status).toBe('manual_review');expect(registrations).toBe(0);
-  db.prepare("UPDATE checkouts SET status='payment_pending' WHERE id=?").run(orderId);
-  await Promise.all([settleCheckout(order(),{status:'PAID',amount:123.45,currency:'INR'},attempt),settleCheckout(order(),{status:'PAID',amount:123.45,currency:'INR'},attempt)]);
-  expect(order().status).toBe('sandbox_paid');expect(registrations).toBe(0);
-  db.prepare("UPDATE checkouts SET status='payment_pending' WHERE id=?").run(orderId);
-  writePrivateSetting(key,config('cashfree','production'));
+  const stored=(await db.prepare('SELECT value FROM settings WHERE key=?').get(key)) as {value:string};expect(stored.value).not.toContain('fixture-secret');expect((await attemptConfig(attempt)).credentials.secretKey).toBe('fixture-secret');
+  expect(JSON.stringify((await publicPaymentSettings()))).not.toContain('fixture-secret');
+  await settleCheckout((await order()),{status:'PAID',amount:1,currency:'INR'},attempt);expect((await order()).status).toBe('manual_review');expect(registrations).toBe(0);
+  (await db.prepare("UPDATE checkouts SET status='payment_pending' WHERE id=?").run(orderId));
+  await Promise.all([settleCheckout((await order()),{status:'PAID',amount:123.45,currency:'INR'},attempt),settleCheckout((await order()),{status:'PAID',amount:123.45,currency:'INR'},attempt)]);
+  expect((await order()).status).toBe('sandbox_paid');expect(registrations).toBe(0);
+  (await db.prepare("UPDATE checkouts SET status='payment_pending' WHERE id=?").run(orderId));
+  (await writePrivateSetting(key,config('cashfree','production')));
   // Avoid an email in this isolated test; provisioning itself must run once.
   const smtp=process.env.SMTP_HOST;process.env.SMTP_HOST='';
-  try{await Promise.all([settleCheckout(order(),{status:'PAID',amount:123.45,currency:'INR'},attempt),settleCheckout(order(),{status:'PAID',amount:123.45,currency:'INR'},attempt)]);}finally{if(smtp===undefined)delete process.env.SMTP_HOST;else process.env.SMTP_HOST=smtp;}
-  expect(order().status).toBe('active');expect(registrations).toBe(1);
- }finally{NameSiloRegistrar.prototype.register=originalRegister;db.prepare('DELETE FROM payment_attempts WHERE checkout_id=?').run(orderId);db.prepare('DELETE FROM checkouts WHERE id=?').run(orderId);db.prepare('DELETE FROM users WHERE id=?').run(userId);db.prepare('DELETE FROM settings WHERE key=?').run(key);}
+  try{await Promise.all([settleCheckout((await order()),{status:'PAID',amount:123.45,currency:'INR'},attempt),settleCheckout((await order()),{status:'PAID',amount:123.45,currency:'INR'},attempt)]);}finally{if(smtp===undefined)delete process.env.SMTP_HOST;else process.env.SMTP_HOST=smtp;}
+  expect((await order()).status).toBe('active');expect(registrations).toBe(1);
+ }finally{NameSiloRegistrar.prototype.register=originalRegister;(await db.prepare('DELETE FROM payment_attempts WHERE checkout_id=?').run(orderId));(await db.prepare('DELETE FROM checkouts WHERE id=?').run(orderId));(await db.prepare('DELETE FROM users WHERE id=?').run(userId));(await db.prepare('DELETE FROM settings WHERE key=?').run(key));}
 });
 
 test('admin selection shows each gateway’s own fields and never exposes saved secrets',async({page})=>{

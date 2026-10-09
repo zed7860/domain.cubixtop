@@ -22,7 +22,7 @@ test('registrar parsing rejects ambiguous and failed responses without simulated
  }finally{globalThis.fetch=originalFetch;if(originalKey===undefined)delete process.env.NAMESILO_API_KEY;else process.env.NAMESILO_API_KEY=originalKey;}
 });
 
-test('Cashfree webhook signatures are verified from the untouched raw payload',()=>{const secret='test-secret',raw='{"data":{"order":{"order_id":"cubix_test"}}}',timestamp='1791360000';const signature=createHmac('sha256',secret).update(timestamp+raw).digest('base64');expect(verifyCashfreeWebhook(raw,timestamp,signature,secret)).toBeTruthy();expect(verifyCashfreeWebhook(raw+' ',timestamp,signature,secret)).toBeFalsy();});
+test('Cashfree webhook signatures are verified from the untouched raw payload',async ()=>{const secret='test-secret',raw='{"data":{"order":{"order_id":"cubix_test"}}}',timestamp='1791360000';const signature=createHmac('sha256',secret).update(timestamp+raw).digest('base64');expect((await verifyCashfreeWebhook(raw,timestamp,signature,secret))).toBeTruthy();expect((await verifyCashfreeWebhook(raw+' ',timestamp,signature,secret))).toBeFalsy();});
 
 test('upstream outage still offers an honest hosted checkout path',async({page})=>{
  await page.route('**/api/domains/search?*',route=>route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'NameSilo live search is temporarily unavailable.',domain:'outage-example.com'})}));
@@ -35,7 +35,7 @@ test('upstream outage still offers an honest hosted checkout path',async({page})
 
 test('customer search, signup, checkout handoff and dashboard work on desktop and mobile',async({page})=>{
  await page.goto('/');
- await expect(page.getByRole('link',{name:'Web development ↗',exact:true})).toHaveAttribute('href','https://cubixtop.com');
+ await expect(page.getByRole('link',{name:'Web development',exact:true})).toHaveAttribute('href','https://www.cubixtop.com');
  await page.getByRole('button',{name:'Switch to night mode'}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.getByRole('button',{name:'Switch to day mode'}).click();

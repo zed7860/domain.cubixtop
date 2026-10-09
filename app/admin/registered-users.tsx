@@ -2,16 +2,16 @@ import Link from 'next/link';
 import { db } from '@/lib/db';
 
 type Account = { id: string; name: string; email: string; role: string; created_at: string; email_verified: number; order_count: number; active_domains: number };
-export default function RegisteredUsers({ query, page, purchased=false }: { query: string; page: number; purchased?:boolean }) {
+export default async function RegisteredUsers({ query, page, purchased=false }: { query: string; page: number; purchased?:boolean }) {
   const pattern = '%' + query.replace(/[\\%_]/g, value => '\\' + value) + '%';
   const where = "WHERE (u.name LIKE ? ESCAPE '\\' OR u.email LIKE ? ESCAPE '\\')" + (purchased ? " AND EXISTS (SELECT 1 FROM checkouts c WHERE c.user_id=u.id AND c.status='active')" : '');
-  const total = (db.prepare(`SELECT COUNT(*) total FROM users u ${where}`).get(pattern, pattern) as { total: number }).total;
+  const total = ((await db.prepare(`SELECT COUNT(*) total FROM users u ${where}`).get(pattern, pattern)) as { total: number }).total;
   const pages = Math.max(1, Math.ceil(total / 20));
   const current = Math.min(page, pages);
-  const accounts = db.prepare(`SELECT u.id,u.name,u.email,u.role,u.created_at,u.email_verified,
+  const accounts = (await db.prepare(`SELECT u.id,u.name,u.email,u.role,u.created_at,u.email_verified,
     (SELECT COUNT(*) FROM checkouts c WHERE c.user_id=u.id AND c.status!='cancelled') order_count,
     (SELECT COUNT(*) FROM checkouts c WHERE c.user_id=u.id AND c.status='active') active_domains
-    FROM users u ${where} ORDER BY u.created_at DESC,u.id LIMIT 20 OFFSET ?`).all(pattern, pattern, (current - 1) * 20) as Account[];
+    FROM users u ${where} ORDER BY u.created_at DESC,u.id LIMIT 20 OFFSET ?`).all(pattern, pattern, (current - 1) * 20)) as Account[];
   const href = (value: number) => '/admin?' + new URLSearchParams({ section: 'customers', q: query, page: String(value), purchased:purchased?'1':'0' }) + '#registered-users';
   return <section className="card admin-users" id="registered-users">
     <div className="customer-view-tabs"><Link className={!purchased?'selected':''} href="/admin?section=customers">All accounts</Link><Link className={purchased?'selected':''} href="/admin?section=customers&purchased=1">Customers with active domains</Link></div>

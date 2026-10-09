@@ -22,9 +22,9 @@ test('API authentication rejects failed, ambiguous and malformed responses',asyn
  }finally{globalThis.fetch=originalFetch;prototype.addResources=originalResources;}
 });
 
-test('verification metadata survives reload and proof cannot transfer to replacement credentials',()=>{
- const saved=config('easebuzz');savePaymentConfig(saved);expect(publicPaymentSettings().gateways.find(g=>g.provider==='easebuzz')).toMatchObject({configured:true,verified:false});recordVerifiedPaymentConnection(saved);expect(publicPaymentSettings().gateways.find(g=>g.provider==='easebuzz')).toMatchObject({verified:true,verificationScope:'payment',verifiedAt:expect.any(String)});
- const replacement={...saved,credentials:{...saved.credentials,salt:'replacement-fixture-salt'}};savePaymentConfig(replacement);recordVerifiedPaymentConnection(saved);expect(publicPaymentSettings().gateways.find(g=>g.provider==='easebuzz')).toMatchObject({verified:false,verifiedAt:null});expect(JSON.stringify(publicPaymentSettings())).not.toContain('replacement-fixture-salt');
+test('verification metadata survives reload and proof cannot transfer to replacement credentials',async ()=>{
+ const saved=config('easebuzz');(await savePaymentConfig(saved));expect((await publicPaymentSettings()).gateways.find(g=>g.provider==='easebuzz')).toMatchObject({configured:true,verified:false});(await recordVerifiedPaymentConnection(saved));expect((await publicPaymentSettings()).gateways.find(g=>g.provider==='easebuzz')).toMatchObject({verified:true,verificationScope:'payment',verifiedAt:expect.any(String)});
+ const replacement={...saved,credentials:{...saved.credentials,salt:'replacement-fixture-salt'}};(await savePaymentConfig(replacement));(await recordVerifiedPaymentConnection(saved));expect((await publicPaymentSettings()).gateways.find(g=>g.provider==='easebuzz')).toMatchObject({verified:false,verifiedAt:null});expect(JSON.stringify((await publicPaymentSettings()))).not.toContain('replacement-fixture-salt');
 });
 
 test('setup forms show verified success and clear it when saved-connection authentication fails',async({page})=>{

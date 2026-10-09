@@ -1,22 +1,53 @@
-# Hosting readiness
+# Deploy to Vercel
 
-The design and build are prepared for the Next.js runtime. `vercel.json`, `netlify.toml` and `.nvmrc` specify build settings. These files do not make the existing storage serverless compatible.
+The app uses Next.js with a persistent remote libSQL database on Vercel. Local development continues to use `.local/domains.sqlite`. Hosted requests never fall back to temporary SQLite storage.
 
-## Current production blocker
+## Required environment variables
 
-Do not launch this application's accounts or payment flows on Vercel or Netlify yet. `lib/db.ts` uses synchronous local SQLite and `lib/settings.ts` stores an encryption key on disk. Both require persistent storage shared across requests. Serverless function filesystems cannot supply this guarantee. Setting `DATA_DIRECTORY=/tmp` would lose accounts and orders and is not a fix.
+Create a **libSQL** database in Turso. Use a separate database for previews. Set these variables in the Vercel project before deployment:
 
-To launch on either platform:
+| Variable | Value |
+| --- | --- |
+| TURSO_DATABASE_URL | Your libsql:// database URL |
+| TURSO_AUTH_TOKEN | Private database token |
+| SETTINGS_ENCRYPTION_KEY | One stable 64-character hexadecimal secret |
+| ADMIN_EMAIL | Administrator email |
+| ADMIN_PASSWORD | Strong password, at least 12 characters |
+| NEXT_PUBLIC_SITE_URL | Public HTTPS website URL |
+| COOKIE_SECURE | true |
 
-1. Migrate users, sessions, auth tokens, checkouts, settings, payment attempts, private admin notes and admin activity to a managed database. Update all synchronous SQL callers to the database's supported API.
-2. Preserve unique order constraints and atomic payment/provisioning claims. Retest concurrent callbacks against the deployed database.
-3. Store one stable 32-byte encryption key in a server-only environment variable, and migrate existing encrypted settings using the original key. Never generate a different key per function instance.
-4. Configure Node.js 24, install with `npm ci`, build with `npm run build`, and use the platform's Next.js integration. Netlify requires its Next.js runtime, not a static export.
-5. Configure values from `.env.example` in the hosting dashboard, including the public HTTPS URL, secure cookies, administrator credentials, SMTP and registrar settings. Do not commit `.env.local` or `.local`.
-6. Confirm NameSilo's outbound-IP requirements with the chosen platform, configure payment callback URLs, and complete authorized sandbox and production payment-to-registration checks.
+Generate a new encryption key locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately and keep the same key across deployments. Losing it makes saved merchant credentials unreadable. Add SMTP and optional NAMESILO_API_KEY values from `.env.example`. Configure merchants and registrar settings in Admin > Integrations.
 
-Until the migration is completed, use one Node.js 24 server with persistent private storage as described in README.md. Neither cloud deployment nor real merchant payments were performed by the automated tests.
+The app creates its runtime tables on first database access. The older `supabase/schema.sql` describes a different data model and is not used by this application.
 
-## Verification
+## Upload and deploy
 
-`npm run typecheck`, `npm run build`, and `npm test` validate the current implementation. Browser coverage includes 320, 390, 768, 1024 and 1440 pixel widths, both themes, domain result currency conversion, public pages, account lifecycle, cart, checkout handoff, administrator access and payment integrity. Merchant responses are fixtures.
+Import the source into Vercel with the **Next.js** preset and **Node.js 24.x**. Select the folder containing package.json as the root. vercel.json uses npm ci and npm run build; leave the output directory at its framework default.
+
+Generate `cubixtop-vercel.zip` with `npm run package:vercel`. The archive contains source and the lockfile, and excludes node_modules, .next, .local, .env.local, logs, and test results. If your import workflow requires a repository, commit the archive's source contents to a repository and import that repository.
+
+Check login, account creation, admin access, and saved settings across requests and redeployments. Confirm registrar outbound-IP requirements. Configure gateway callbacks using the public website URL and complete sandbox checkout and signed notification checks before using production payments. Automated payments use fixtures and do not prove merchant activation or live registration.
+
+## Preserve existing accounts and settings
+
+Stop local writes and back up `.local/domains.sqlite` and `.local/settings.key`. Import the SQLite database into an empty remote **libSQL** database using Turso's SQLite import workflow. This preserves runtime tables, accounts, orders, and encrypted payment snapshots. Do not apply supabase/schema.sql over it.
+
+Set SETTINGS_ENCRYPTION_KEY to the **hexadecimal encoding of the original settings.key file**, rather than generating a replacement. Keep it private. Verify imported records and decrypted integrations before changing the production URL. No remote database has been provisioned and no existing records have been uploaded automatically.
+
+## Troubleshooting
+
+### GitHub automatic deployment and Zoho email
+
+Push this project's source to the GitHub repository already connected to your Vercel project. Vercel must track the branch you push. Keep the Next.js preset, Node.js 24, `npm ci` install and `npm run build` build commands.
+
+The verified local Zoho SMTP host for info@cubixtop.com is **smtp.zoho.in**, using port **587**, `SMTP_SECURE=false`, and required STARTTLS. Set SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD and EMAIL_FROM in **Vercel's environment variables**. The updated local app password remains in the ignored `.env.local`; GitHub pushes do not copy it into Vercel. If changing the Zoho account or plan, use the host shown in that mailbox's Server Configuration Details.
+
+Run `npm run verify:email` to verify SMTP authentication without sending mail. Run `npm run check:deployment` to identify missing hosted configuration. The remote database variables TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and SETTINGS_ENCRYPTION_KEY still need to be supplied in Vercel if not already configured there. Redeploy after changing Vercel environment variables.
+
+Signup welcome emails and password-reset emails use these SMTP settings. Password reset links expire in two hours and become invalid after a successful reset. Set NEXT_PUBLIC_SITE_URL to the actual HTTPS production domain so email links point to the deployed application. The email-flow test runs an isolated server with a captured mailbox and verifies the signup message, browser recovery flow, expiry, token replacement, single use, concurrent submissions, session revocation and delivery failure. It sends no real emails.
+
+Authentication initialization failures return JSON HTTP 503 and log `Authentication service initialization failed`. Inspect Vercel runtime logs for missing database credentials, invalid encryption keys, and connection errors. DATA_DIRECTORY=/tmp cannot provide persistent hosted storage.
+
+Local development without remote database variables retains SQLite and the existing key. Back up both files together. Netlify deployments also require the remote database and stable key, using its Next.js runtime.
+
+References: [Vercel Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), [Turso TypeScript SDK](https://docs.turso.tech/sdk/ts/reference).

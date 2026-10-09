@@ -1,0 +1,101 @@
+import { test, expect } from '@playwright/test';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
+
+type Mail = {to:string;subject:string;text:string;html:string};
+test('signup welcome and two-hour reset emails work; expired, replaced and used links fail', async ({ page, playwright }) => {
+  test.setTimeout(60000);
+  const root=mkdtempSync(join(process.cwd(),'.local','test-email-flows-'));
+  const mailbox=join(root,'mailbox.jsonl'),preload=join(root,'mailbox.cjs'),base='http://127.0.0.1:3006';
+  writeFileSync(mailbox,'');
+  writeFileSync(preload,`const fs=require('node:fs');const capture=()=>({sendMail:async mail=>{if(fs.existsSync(process.env.TEST_MAILBOX+'.fail'))throw new Error('Fixture SMTP failure');fs.appendFileSync(process.env.TEST_MAILBOX,JSON.stringify(mail)+'\\n');return {accepted:[mail.to],rejected:[]};}});require('nodemailer').createTransport=capture;import('nodemailer').then(module=>{module.default.createTransport=capture;});`);
+  const child=spawn(process.execPath,['--require',preload,'node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3006'],{cwd:process.cwd(),env:{...process.env,DATA_DIRECTORY:root,TEST_MAILBOX:mailbox,TURSO_DATABASE_URL:'',TURSO_AUTH_TOKEN:'',SETTINGS_ENCRYPTION_KEY:'',NEXT_PUBLIC_SITE_URL:base,COOKIE_SECURE:'false',ADMIN_EMAIL:'admin@example.invalid',ADMIN_PASSWORD:'Fixture-Admin-Password-123456',SMTP_HOST:'smtp.fixture.invalid',SMTP_USER:'sender@example.invalid',SMTP_PASSWORD:'fixture-only',SMTP_PORT:'587',SMTP_SECURE:'false',EMAIL_FROM:'Cubixtop <sender@example.invalid>'},stdio:['ignore','ignore','pipe']});
+  let logs='';child.stderr.on('data',data=>{logs+=String(data);});
+  page.on('pageerror',error=>{logs+='\nBrowser error: '+error.message;});
+  const context=await playwright.request.newContext({baseURL:base});
+  const mails=()=>readFileSync(mailbox,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line) as Mail);
+  let sequence=0;
+  const post=(data:unknown)=>context.post('/api/password',{data,headers:{'x-forwarded-for':`192.0.2.${100+sequence++}`}});
+  const tokenFrom=(mail:Mail)=>mail.text.match(/\/reset-password\?token=([a-f0-9]{64})/)![1];
+  const hash=(token:string)=>createHash('sha256').update(token).digest('hex');
+  let fixture:DatabaseSync|undefined;
+  try{
+    await expect.poll(async()=>{try{return (await context.get('/api/auth',{timeout:1000})).status();}catch{return 0;}},{timeout:15000,message:logs}).toBe(200);
+    const email='welcome-customer@example.invalid',oldPassword='Original-Password-123456',newPassword='Replacement-Password-123456';
+    const signup=await context.post('/api/auth',{data:{action:'signup',email,name:'Customer <b>Example</b>',password:oldPassword}});
+    expect(signup.status()).toBe(200);
+    const user=(await signup.json()).user;
+    expect(mails(),logs).toHaveLength(1);
+    const welcome=mails()[0];
+    expect(welcome.to).toBe(email);
+    expect(welcome.subject).toBe('Welcome to Cubixtop Domain');
+    expect(welcome.text).toContain('24 hours');expect(welcome.text).toContain('/dashboard');
+    expect(welcome.html).toContain('&lt;b&gt;Example&lt;/b&gt;');expect(welcome.html).not.toContain('<b>Example</b>');
+    expect(welcome.text).not.toContain(oldPassword);
+    const verification=welcome.text.match(/\/verify\?token=([a-f0-9]{64})/)![1];
+    expect((await context.post('/api/verify',{data:{token:verification}})).status()).toBe(200);
+    fixture=new DatabaseSync(join(root,'domains.sqlite'));
+
+    await page.goto(base+'/login');
+    await page.getByRole('link',{name:'Forgot password?'}).click();
+    await expect(page).toHaveURL(base+'/forgot-password');
+    await page.getByRole('button',{name:'Switch to night mode'}).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+    await page.getByLabel('Email address').fill(email);
+    const requestedAt=Date.now();
+    await page.getByRole('button',{name:'Send reset link'}).click();
+    await expect(page.getByRole('status'),logs).toContainText('2 hours');
+    expect(mails()).toHaveLength(2);
+    const resetMail=mails()[1],token=tokenFrom(resetMail);
+    expect(resetMail.to).toBe(email);expect(resetMail.text).toContain('only once');
+    const row=fixture.prepare('SELECT token,expires FROM auth_tokens WHERE user_id=? AND purpose=?').get(user.id,'reset') as {token:string;expires:number};
+    expect(row.token).toBe(hash(token));expect(row.token).not.toBe(token);
+    expect(row.expires).toBeGreaterThanOrEqual(requestedAt+2*60*60*1000);
+    expect(row.expires).toBeLessThan(Date.now()+2*60*60*1000+1000);
+
+    await page.goto(base+'/reset-password?token='+token);
+    await page.getByLabel('New password',{exact:true}).fill(newPassword);
+    await page.getByLabel('Confirm password',{exact:true}).fill(newPassword);
+    await page.getByRole('button',{name:'Update password'}).click();
+    await expect(page.getByRole('heading',{name:'Password updated.'})).toBeVisible();
+    expect(page.url()).not.toContain('token=');
+    expect((await context.get('/api/auth')).status()).toBe(200);
+    expect((await (await context.get('/api/auth')).json()).user).toBeNull();
+    expect((await post({action:'reset',token,password:'Replay-Password-123456'})).status()).toBe(400);
+    expect((await context.post('/api/auth',{data:{action:'login',email,password:oldPassword}})).status()).toBe(401);
+    expect((await context.post('/api/auth',{data:{action:'login',email,password:newPassword}})).status()).toBe(200);
+
+    expect((await post({action:'request',email})).status()).toBe(200);
+    const expired=tokenFrom(mails().at(-1)!);
+    fixture.prepare('UPDATE auth_tokens SET expires=? WHERE token=?').run(Date.now()-1,hash(expired));
+    expect((await post({action:'reset',token:expired,password:newPassword})).status()).toBe(400);
+    expect((await post({action:'request',email})).status()).toBe(200);
+    const replaced=tokenFrom(mails().at(-1)!);
+    expect((await post({action:'request',email})).status()).toBe(200);
+    const concurrent=tokenFrom(mails().at(-1)!);
+    expect((await post({action:'reset',token:replaced,password:newPassword})).status()).toBe(400);
+    const results=await Promise.all([post({action:'reset',token:concurrent,password:newPassword}),post({action:'reset',token:concurrent,password:newPassword})]);
+    expect(results.map(response=>response.status()).sort()).toEqual([200,400]);
+    const count=mails().length;
+    const unknown=await post({action:'request',email:'unknown@example.invalid'});
+    expect(unknown.status()).toBe(200);expect((await unknown.json()).message).toContain('If an account exists');expect(mails()).toHaveLength(count);
+    expect((await context.post('/api/auth',{data:{action:'login',email:'admin@example.invalid',password:'Fixture-Admin-Password-123456'}})).status()).toBe(200);
+    const adminRequestedAt=Date.now();
+    const adminReset=await context.post(`/api/admin/users/${user.id}`,{data:{action:'send_password_reset'}});
+    expect(adminReset.status()).toBe(200);expect((await adminReset.json()).message).toContain('2 hours');
+    const adminToken=tokenFrom(mails().at(-1)!);
+    expect((fixture.prepare('SELECT expires FROM auth_tokens WHERE token=?').get(hash(adminToken)) as {expires:number}).expires).toBeGreaterThanOrEqual(adminRequestedAt+2*60*60*1000);
+    writeFileSync(mailbox+'.fail','fixture');
+    expect((await post({action:'request',email})).status()).toBe(502);
+    expect(fixture.prepare("SELECT token FROM auth_tokens WHERE user_id=? AND purpose='reset'").get(user.id)).toBeUndefined();
+    const failedWelcome=await context.post('/api/auth',{data:{action:'signup',email:'delivery-failure@example.invalid',name:'Delivery Failure',password:oldPassword}});
+    expect(failedWelcome.status()).toBe(200);
+    expect((await (await context.get('/api/auth')).json()).user.email).toBe('delivery-failure@example.invalid');
+  }finally{
+    fixture?.close();await context.dispose();
+    if(child.exitCode===null){const closed=new Promise(resolve=>child.once('exit',resolve));child.kill();await closed;}
+  }
+});

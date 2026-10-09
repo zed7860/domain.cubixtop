@@ -1,4 +1,5 @@
 "use client";
+import { readApiResponse } from '@/lib/api-response';
 import {useState} from 'react';
 import {CheckCircle2} from 'lucide-react';
 import {paymentCatalog,paymentProviders,type PaymentProvider} from '@/lib/payment-catalog';
@@ -8,7 +9,7 @@ export default function PaymentSettings({initial,siteUrl}:{initial:Summary;siteU
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const selected=summary.gateways.find(g=>g.provider===provider),catalog=paymentCatalog[provider],activeGateway=summary.gateways.find(g=>g.provider===summary.active);
  async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget,data=new FormData(form);await save({provider,environment,credentials:Object.fromEntries(catalog.fields.map(f=>[f.key,String(data.get(f.key)||'')]))},form);}
- async function save(body:unknown,form?:HTMLFormElement){setBusy(true);setMessage('');setError('');try{const response=await fetch('/api/admin/payments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),data=await response.json();if(data.gateways)setSummary(data);if(!response.ok)throw new Error(data.error);setMessage(data.message);form?.reset();}catch(value){setError((value as Error).message);}finally{setBusy(false);}}
+ async function save(body:unknown,form?:HTMLFormElement){setBusy(true);setMessage('');setError('');try{const response=await fetch('/api/admin/payments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),data=await readApiResponse<Summary & {message:string;error?:string}>(response);if(data.gateways)setSummary(data);if(!response.ok)throw new Error(data.error);setMessage(data.message);form?.reset();}catch(value){setError((value as Error).message);}finally{setBusy(false);}}
  return <section className="card settings-card"><div className="settings-heading"><div><span className="eyebrow">PAYMENT SETTINGS</span><h2>Payment gateways</h2><p className="muted">Choose a gateway and authenticate its merchant settings. Checkout uses the selected integration.</p></div><span className={`status-dot ${activeGateway?.verified?'connected':''}`}>{activeGateway?.verified?'Successfully connected':summary.active?'Saved · verification pending':'Not configured'}</span></div>
  {activeGateway?.verifiedAt&&<p className="muted fine-print">{summary.active&&paymentCatalog[summary.active].name} · {activeGateway.environment} · {activeGateway.verificationScope==='payment'?'Payment verified':'API authentication verified'} · {new Date(activeGateway.verifiedAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} IST</p>}
  <form className="form" onSubmit={submit}>
@@ -23,3 +24,5 @@ export default function PaymentSettings({initial,siteUrl}:{initial:Summary;siteU
  {message&&<p className={`notice ${message.startsWith('Successfully connected')?'connection-success':''}`} role="status">{message.startsWith('Successfully connected')&&<CheckCircle2 size={18}/>} {message}</p>}{error&&<p className="error" role="alert">{error}</p>}
  </section>;
 }
+
+

@@ -1,9 +1,35 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { readApiResponse } from '@/lib/api-response';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ArrowUpRight, X } from 'lucide-react';
 import ThemeToggle from './theme-toggle';
 import CartLink from './cart-link';
 type User={name:string;email:string;role:string};
-export default function AccountNav(){const[user,setUser]=useState<User|null>(null);useEffect(()=>{fetch('/api/auth').then(r=>r.json()).then(d=>setUser(d.user)).catch(()=>{});},[]);async function logout(){await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});location.href='/';}return <div className="links"><Link href="/">Domains</Link><a href="https://cubixtop.com" rel="noopener">Web development ↗</a><Link href="/dashboard">My domains</Link>{user?.role==='admin'&&<Link href="/admin">Admin</Link>}{user?<><Link href="/account">Account</Link><button className="btn2" onClick={logout}>Sign out</button></>:<Link className="btn" href="/login">Sign in ↗</Link>}<CartLink/><ThemeToggle/></div>;}
+export default function AccountNav(){
+ const [user,setUser]=useState<User|null>(null),[open,setOpen]=useState(false);
+ const dialog=useRef<HTMLDialogElement>(null),pathname=usePathname();
+ useEffect(()=>{fetch('/api/auth').then(r=>readApiResponse(r)).then(d=>setUser(d.user)).catch(()=>{});},[]);
+ useEffect(()=>{if(!open)return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[open]);
+ function close(){dialog.current?.close();setOpen(false);}
+ function show(){dialog.current?.showModal();setOpen(true);}
+ async function logout(){const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});if(response.ok)location.href='/';}
+ const items=[{href:'/',label:'Domains'},{href:'/dashboard',label:'My domains'},...(user?.role==='admin'?[{href:'/admin',label:'Admin'}]:[]),...(user?[{href:'/account',label:'Account'}]:[{href:'/login',label:'Sign in'}]),{href:'/cart',label:'Cart'},{href:'/help',label:'Help & support'},{href:'https://www.cubixtop.com',label:'Web development'}];
+ return <><div className="links">
+  <Link href="/" aria-current={pathname==='/'?'page':undefined}>Domains</Link>
+  <Link href="/dashboard" aria-current={pathname.startsWith('/dashboard')?'page':undefined}>My domains</Link>
+  {user?.role==='admin'&&<Link href="/admin" aria-current={pathname.startsWith('/admin')?'page':undefined}>Admin</Link>}
+  {user?<><Link href="/account">Account</Link><button className="btn2" onClick={logout}>Sign out</button></>:<Link className="btn" href="/login">Sign in ↗</Link>}
+  <CartLink/><ThemeToggle/>
+  <button type="button" className="hamburger-control" aria-label="Open navigation" aria-expanded={open} aria-controls="full-navigation" onClick={show}><span>Menu</span><span className="hamburger-lines" aria-hidden="true"><i/><i/></span></button>
+  <a className="btn2 web-development" href="https://www.cubixtop.com" rel="noopener">Web development <ArrowUpRight size={16}/></a>
+ </div><dialog ref={dialog} id="full-navigation" className="navigation-dialog" aria-labelledby="navigation-title" onClose={()=>setOpen(false)}>
+  <div className="navigation-top"><span id="navigation-title">CUBIXTOP · DOMAINS</span><button className="navigation-close" type="button" aria-label="Close navigation" onClick={close}>Close <X size={22}/></button></div>
+  <nav aria-label="Main navigation">{items.map((item,index)=><Link key={item.href} href={item.href} onClick={close} aria-current={pathname===item.href?'page':undefined}><small>{String(index+1).padStart(2,'0')}</small><span>{item.label}</span><ArrowUpRight size={26}/></Link>)}</nav>
+  <div className="navigation-footer"><p>Technology. Infrastructure.<br/>Your next idea, online.</p><a href="mailto:info@cubixtop.com">info@cubixtop.com</a></div>
+ </dialog></>;
+}
+
 
 

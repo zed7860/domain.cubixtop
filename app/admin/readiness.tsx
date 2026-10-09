@@ -1,8 +1,8 @@
 import {getPaymentConfig} from '@/lib/payment-gateways';
 import {getRegistrarSettings} from '@/lib/settings';
 import {emailReady} from '@/lib/email';
-export default function Readiness(){
- const config=getPaymentConfig(),registrar=getRegistrarSettings();
+export default async function Readiness(){
+ const config=(await getPaymentConfig()),registrar=(await getRegistrarSettings());
  const checks=[
   ['Payment gateway configured',Boolean(config)],
   ['Production payment environment selected',config?.environment==='production'],

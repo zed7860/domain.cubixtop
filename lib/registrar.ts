@@ -1,7 +1,7 @@
 import { domainToASCII } from "node:url";
 import {getRegistrarSettings} from './settings';
 
-function nameSiloKey(){const saved=getRegistrarSettings();return saved?.provider==='namesilo'?saved.credentials.apiKey:process.env.NAMESILO_API_KEY;}
+async function nameSiloKey(){const saved=(await getRegistrarSettings());return saved?.provider==='namesilo'?saved.credentials.apiKey:process.env.NAMESILO_API_KEY;}
 
 export function normalizeDomain(value: string): string {
   let domain = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -35,7 +35,7 @@ export class NameSiloRegistrar {
   async searchMany(domains:string[],years=1):Promise<DomainQuote[]>{
     const normalized=[...new Set(domains.map(normalizeDomain))];
     const quotes=normalized.map(domain=>({domain,available:null,price:null,currency:'USD' as const,provider:'namesilo' as const,verified:false,purchaseUrl:purchaseUrl(domain)}));
-    const key = nameSiloKey();
+    const key = (await nameSiloKey());
     if (!key) return quotes;
     const url = new URL("https://www.namesilo.com/api/checkRegisterAvailability");
     url.search = new URLSearchParams({ version: "1", type: "json", key, domains: normalized.join(','), years:String(Math.max(1,Math.min(10,years))) }).toString();
@@ -51,11 +51,11 @@ export class NameSiloRegistrar {
     if(!available.length&&!unavailable.length)throw new Error("NameSilo returned an inconclusive result. Please try again.");
     return quotes.map(quote=>{const match=available.find((item:unknown)=>domainValue(item)===quote.domain) as {price?:unknown}|undefined;if(!match&&!unavailable.includes(quote.domain))return quote;const price=Number(match?.price);return {...quote,available:Boolean(match),verified:true,price:match&&Number.isFinite(price)&&price>0?price:null};});
   }
-  async register(input:{domain:string;years:number;contact:{fn:string;ln:string;ad:string;cy:string;st:string;zp:string;ct:string;em:string;ph:string}}){const key=nameSiloKey();if(!key)throw new Error('Registrar API is not configured.');const url=new URL('https://www.namesilo.com/api/registerDomain');url.search=new URLSearchParams({version:'1',type:'json',key,domain:normalizeDomain(input.domain),years:String(input.years),private:'1',auto_renew:'0',portfolio:'Cubixtop Customers',...input.contact}).toString();const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000),headers:{Accept:'application/json','User-Agent':'Cubixtop-Domains/1.0'}});const data=await response.json().catch(()=>null);const code=Number(data?.reply?.code);if(!response.ok||![300,301,302].includes(code))throw new Error(data?.reply?.detail||'Registrar did not confirm registration.');return {code,reference:String(data.reply.domain||input.domain),amount:Number(data.reply.order_amount||0)};}
-  private async api(operation:string,params:Record<string,string>){const key=nameSiloKey();if(!key)throw new Error('Domain management is not configured.');const url=new URL(`https://www.namesilo.com/api/${operation}`);url.search=new URLSearchParams({version:'1',type:'json',key,...params}).toString();const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000),headers:{Accept:'application/json','User-Agent':'Cubixtop-Domains/1.0'}});const data=await response.json().catch(()=>null);if(!response.ok||Number(data?.reply?.code)!==300)throw new Error(data?.reply?.detail||'The domain update could not be completed.');return data.reply;}
+  async register(input:{domain:string;years:number;contact:{fn:string;ln:string;ad:string;cy:string;st:string;zp:string;ct:string;em:string;ph:string}}){const key=(await nameSiloKey());if(!key)throw new Error('Registrar API is not configured.');const url=new URL('https://www.namesilo.com/api/registerDomain');url.search=new URLSearchParams({version:'1',type:'json',key,domain:normalizeDomain(input.domain),years:String(input.years),private:'1',auto_renew:'0',portfolio:'Cubixtop Customers',...input.contact}).toString();const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000),headers:{Accept:'application/json','User-Agent':'Cubixtop-Domains/1.0'}});const data=await response.json().catch(()=>null);const code=Number(data?.reply?.code);if(!response.ok||![300,301,302].includes(code))throw new Error(data?.reply?.detail||'Registrar did not confirm registration.');return {code,reference:String(data.reply.domain||input.domain),amount:Number(data.reply.order_amount||0)};}
+  private async api(operation:string,params:Record<string,string>){const key=(await nameSiloKey());if(!key)throw new Error('Domain management is not configured.');const url=new URL(`https://www.namesilo.com/api/${operation}`);url.search=new URLSearchParams({version:'1',type:'json',key,...params}).toString();const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000),headers:{Accept:'application/json','User-Agent':'Cubixtop-Domains/1.0'}});const data=await response.json().catch(()=>null);if(!response.ok||Number(data?.reply?.code)!==300)throw new Error(data?.reply?.detail||'The domain update could not be completed.');return data.reply;}
   async listDns(domain:string):Promise<DnsRecord[]>{const reply=await this.api('dnsListRecords',{domain:normalizeDomain(domain)});return asArray(reply.resource_record) as DnsRecord[];}
-  async addDns(domain:string,record:{type:string;host:string;value:string;ttl:number;distance:number}){return this.api('dnsAddRecord',{domain:normalizeDomain(domain),rrtype:record.type,rrhost:record.host==='@'?'':record.host,rrvalue:record.value,rrttl:String(record.ttl),rrdistance:String(record.distance)});}
-  async updateDns(domain:string,record:{id:string;host:string;value:string;ttl:number;distance:number}){return this.api('dnsUpdateRecord',{domain:normalizeDomain(domain),rrid:record.id,rrhost:record.host==='@'?'':record.host,rrvalue:record.value,rrttl:String(record.ttl),rrdistance:String(record.distance)});}
-  async deleteDns(domain:string,id:string){return this.api('dnsDeleteRecord',{domain:normalizeDomain(domain),rrid:id});}
+  async addDns(domain:string,record:{type:string;host:string;value:string;ttl:number;distance:number}){return (await this.api('dnsAddRecord',{domain:normalizeDomain(domain),rrtype:record.type,rrhost:record.host==='@'?'':record.host,rrvalue:record.value,rrttl:String(record.ttl),rrdistance:String(record.distance)}));}
+  async updateDns(domain:string,record:{id:string;host:string;value:string;ttl:number;distance:number}){return (await this.api('dnsUpdateRecord',{domain:normalizeDomain(domain),rrid:record.id,rrhost:record.host==='@'?'':record.host,rrvalue:record.value,rrttl:String(record.ttl),rrdistance:String(record.distance)}));}
+  async deleteDns(domain:string,id:string){return (await this.api('dnsDeleteRecord',{domain:normalizeDomain(domain),rrid:id}));}
 }
 

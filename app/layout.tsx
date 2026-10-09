@@ -1,4 +1,5 @@
 import './globals.css';
+import './polish.css';
 import Link from 'next/link';
 import AccountNav from './account-nav';
 export const metadata={metadataBase:new URL('https://domain.cubixtop.com'),title:{default:'Cubixtop Domains',template:'%s · Cubixtop Domains'},description:'Search, register and manage domains with Cubixtop.',icons:{icon:'/icon.svg'},openGraph:{title:'Cubixtop Domains',description:'Your next idea starts with the right domain.',url:'https://domain.cubixtop.com',siteName:'Cubixtop Domains',type:'website'}};

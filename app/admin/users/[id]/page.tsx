@@ -26,13 +26,13 @@ export default async function UserProfile({ params }: { params: Promise<{ id: st
   const { id } = await params;
   if (!viewer) redirect('/login?next=' + encodeURIComponent('/admin/users/' + id));
   if (viewer.role !== 'admin') redirect('/dashboard');
-  const account = db.prepare('SELECT id,name,email,role,created_at,email_verified FROM users WHERE id=?').get(id) as Profile | undefined;
+  const account = (await db.prepare('SELECT id,name,email,role,created_at,email_verified FROM users WHERE id=?').get(id)) as Profile | undefined;
   if (!account) notFound();
-  const profile=readProfile(id);
-  const note = db.prepare('SELECT note FROM admin_notes WHERE user_id=?').get(id) as {note:string}|undefined;
-  const sessions = (db.prepare('SELECT COUNT(*) total FROM sessions WHERE user_id=? AND expires>?').get(id,Date.now()) as {total:number}).total;
-  const orders = db.prepare('SELECT id,user_id,domain,quote,status,created_at,updated_at,amount_inr,contact,registrar_reference,failure_reason FROM checkouts WHERE user_id=? ORDER BY created_at DESC,id').all(id) as Checkout[];
-  const payments = db.prepare('SELECT p.id,c.domain,p.provider,p.gateway_order_id,p.status,p.amount_inr,p.created_at FROM payment_attempts p JOIN checkouts c ON c.id=p.checkout_id WHERE c.user_id=? ORDER BY p.created_at DESC,p.id').all(id) as Payment[];
+  const profile=(await readProfile(id));
+  const note = (await db.prepare('SELECT note FROM admin_notes WHERE user_id=?').get(id)) as {note:string}|undefined;
+  const sessions = ((await db.prepare('SELECT COUNT(*) total FROM sessions WHERE user_id=? AND expires>?').get(id,Date.now())) as {total:number}).total;
+  const orders = (await db.prepare('SELECT id,user_id,domain,quote,status,created_at,updated_at,amount_inr,contact,registrar_reference,failure_reason FROM checkouts WHERE user_id=? ORDER BY created_at DESC,id').all(id)) as Checkout[];
+  const payments = (await db.prepare('SELECT p.id,c.domain,p.provider,p.gateway_order_id,p.status,p.amount_inr,p.created_at FROM payment_attempts p JOIN checkouts c ON c.id=p.checkout_id WHERE c.user_id=? ORDER BY p.created_at DESC,p.id').all(id)) as Payment[];
   return <main className="wrap section"><Link className="text-link" href="/admin#registered-users">← Back to registered users</Link><div className="section-heading"><div><span className="eyebrow">REGISTERED ACCOUNT</span><h1 className="title">{account.name}</h1><p className="muted">{account.email}</p></div><span className="badge">{account.role}</span></div>
     <section className="card"><h2>Account profile</h2><dl className="profile-details">{[['Account ID',account.id],['Full name',account.name],['Email address',account.email],['Role',account.role],['Email verification',account.email_verified ? 'Verified' : 'Not verified'],['Registered on (UTC)',account.created_at],['Domain orders',String(orders.filter(order=>order.status!=='cancelled').length)],['Mobile number',profile.phone||'Not provided'],['Address',profile.address||'Not provided'],['City',profile.city||'Not provided'],['State / province',profile.state||'Not provided'],['Postal code',profile.postal_code||'Not provided'],['Country',profile.country||'Not provided'],['Active domains',String(orders.filter(order => order.status === 'active').length)]].map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
     {account.role!=='admin'&&<><ProfileEditor profile={profile} userId={id}/><PasswordResetTools userId={id}/></>}

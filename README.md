@@ -2,7 +2,7 @@
 
 Next.js domain reseller website with customer accounts, domain search, checkout, signed payment notifications, domain provisioning, DNS management and an administrator control center.
 
-The interface uses a Hostick-inspired blue theme, responsive layouts and an accessible icon-only light/dark switch. See [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel and Netlify build settings and the required persistent-storage migration before a serverless production launch.
+The interface matches Cubixtop's deep green, cream and orange palette, with responsive layouts, a full-screen navigation menu and an accessible icon-only light/dark switch. Web development is the final navigation item. See [DEPLOYMENT.md](DEPLOYMENT.md) for GitHub/Vercel deployment, Zoho SMTP verification and remote database configuration.
 
 Administrators can search all registered accounts in **Admin > Registered users**, including accounts with no orders. **View profile** shows account metadata, email verification, domain orders, per-domain registrant contact details and payment history. Phone and address are collected during checkout; accounts without submitted checkout details display them as unavailable. Passwords, session tokens and integration credentials are excluded from profiles.
 
@@ -10,11 +10,15 @@ The administration workspace has eight navigation areas: Overview, Customers, Do
 
 Customers can edit their name, email, mobile and address in **Account**. Administrators can edit customer profiles and reset passwords from **Customers > View profile**. Email changes clear verification and revoke existing sessions; a customer must supply their current password when changing their own email. Administrator password replacements revoke customer sessions and existing recovery links. Reset and verification emails require working SMTP; otherwise the interface reports that delivery is unavailable. Previously submitted registrar contacts remain attached to the original domain order.
 
+New customers receive a personalized **Welcome to Cubixtop Domain** email at their registered address, with account guidance, support contact details and a 24-hour email-verification link. Email content is escaped before HTML rendering. A failed welcome delivery is logged without preventing access to an already-created account; customers can request verification again from Account.
+
+**Forgot password?** on the login page sends a reset email for a registered account. The reset link expires after **2 hours** and works **once**. Requesting another link replaces the previous link. Resetting the password invalidates all recovery tokens and existing sessions; changing a password in Account also invalidates pending reset links. Administrators use the same two-hour expiry when emailing a reset link. Forgotten-password responses do not disclose whether an email is registered. SMTP failures are reported rather than presented as a successful send.
+
 **Cancel unpaid order** is available in the customer dashboard, admin order list and customer profile. Cancelled orders leave the current dashboard and default admin lists but remain in history; admins can choose the **cancelled** status filter. Existing gateway attempts must be checked before cancellation. Paid, provisioning and review orders cannot be cancelled here. A payment received after cancellation is retained for manual review instead of registering a domain automatically. **Check payment status** lets admins reconcile an order with its gateway. The customer directory can be filtered to accounts with active domains.
 
 ## Run
 
-Requires Node.js 24 or later (the application uses built-in SQLite).
+Requires Node.js 24. Local development uses SQLite; Vercel uses remote libSQL storage.
 
 ```powershell
 npm install
@@ -79,7 +83,7 @@ Missing email settings disable email delivery. Merchant activation, real credent
 
 ## Storage and deployment
 
-Deploy on one persistent Node.js server. SQLite is stored in `DATA_DIRECTORY/domains.sqlite`. Credentials are encrypted with `DATA_DIRECTORY/settings.key`; back up this key with the database and restrict access to both. Losing the key makes saved integration credentials unreadable. This version must not run on ephemeral serverless storage or multiple independent servers.
+Deploy on Vercel using TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and a stable SETTINGS_ENCRYPTION_KEY. See DEPLOYMENT.md for setup and existing-data migration. For local development or a persistent single server, SQLite is stored in DATA_DIRECTORY/domains.sqlite and the fallback key in DATA_DIRECTORY/settings.key. Back up both files together.
 
 Point the website domain at your server, terminate HTTPS and expose the notification routes publicly. Merchant callbacks cannot reach localhost. Set up private backups and keep the data directory outside publicly served files. Accounts with payment records need support-assisted closure so payment and registration records are not lost.
 

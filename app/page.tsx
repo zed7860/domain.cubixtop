@@ -1,4 +1,5 @@
 "use client";
+import { readApiResponse } from '@/lib/api-response';
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Globe2, Search, ShieldCheck, Sparkles, Server, LockKeyhole } from "lucide-react";
@@ -21,7 +22,7 @@ export default function Home() {
     setLoading(true); setError(""); setResult(null); setResults([]); setFallbackDomain("");
     try {
       const response = await fetch("/api/domains/search?q=" + encodeURIComponent(value));
-      const data = await response.json();
+      const data = await readApiResponse<DomainQuote & {error?:string;results?:DomainQuote[];exchangeRate?:number}>(response);
       if (!response.ok) { if (id === requestId.current && data.domain) setFallbackDomain(data.domain); throw new Error(data.error || "Search failed. Please try again."); }
       if (id === requestId.current) { setResult(data); setResults(Array.isArray(data.results)?data.results:[data]); setExchangeRate(Number(data.exchangeRate)||null); }
     } catch (error) { if (id === requestId.current) setError((error as Error).message); }
@@ -49,6 +50,8 @@ export default function Home() {
     <section className="wrap section"><div className="feature-band"><Globe2 size={38} /><div><span className="eyebrow">FROM IDEA TO ONLINE</span><h2>A clear path to your new domain.</h2><p className="muted">Search, create your account, review your order and manage everything from one workspace.</p></div><ShieldCheck size={38} /></div></section>
   </main>;
 }
+
+
 
 
 
