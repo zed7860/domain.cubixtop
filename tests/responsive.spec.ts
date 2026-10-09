@@ -17,9 +17,11 @@ test('public pages and domain results fit phones, tablets and desktops in both t
       }, theme);
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await page.getByRole('button',{name:'Open navigation'}).click();
       const toggle = page.getByRole('button', { name: `Switch to ${theme === 'light' ? 'night' : 'day'} mode` });
       await expect(toggle).toBeVisible();
       await expect(toggle).toHaveText('');
+      await page.getByRole('button',{name:'Close navigation'}).click();
       await page.getByRole('textbox', { name: 'Domain name' }).fill('responsive-example.com');
       await page.getByRole('button', { name: 'Find my domain' }).click();
       await expect(page.getByRole('heading', { name: 'responsive-example.com' })).toBeVisible();

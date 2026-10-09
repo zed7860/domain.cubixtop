@@ -42,7 +42,9 @@ test('signup welcome and two-hour reset emails work; expired, replaced and used 
     await page.goto(base+'/login');
     await page.getByRole('link',{name:'Forgot password?'}).click();
     await expect(page).toHaveURL(base+'/forgot-password');
+    await page.getByRole('button',{name:'Open navigation'}).click();
     await page.getByRole('button',{name:'Switch to night mode'}).click();
+    await page.getByRole('button',{name:'Close navigation'}).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
     await page.getByLabel('Email address').fill(email);
     const requestedAt=Date.now();

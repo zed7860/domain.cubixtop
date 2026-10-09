@@ -35,16 +35,19 @@ test('upstream outage still offers an honest hosted checkout path',async({page})
 
 test('customer search, signup, checkout handoff and dashboard work on desktop and mobile',async({page})=>{
  await page.goto('/');
- await expect(page.getByRole('link',{name:'Web development',exact:true})).toHaveAttribute('href','https://www.cubixtop.com');
+ await page.getByRole('button',{name:'Open navigation'}).click();
+ await expect(page.getByRole('link',{name:/Web development/})).toHaveAttribute('href','https://www.cubixtop.com');
  await page.getByRole('button',{name:'Switch to night mode'}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  await page.getByRole('button',{name:'Switch to day mode'}).click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await page.getByRole('button',{name:'Close navigation'}).click();
  await page.getByRole('textbox',{name:'Domain name'}).fill('test-cubixtop-example.com');
  await page.getByRole('button',{name:'Find my domain'}).click();
  await expect(page.getByRole('heading',{name:'test-cubixtop-example.com'})).toBeVisible();
  await expect(page.getByText('Continue to confirm current availability and pricing.')).toBeVisible();
  await page.getByRole('button',{name:'Add to cart'}).first().click();
+ await page.getByRole('button',{name:'Open navigation'}).click();
  await expect(page.getByRole('link',{name:'Cart with 1 domains'})).toBeVisible();
  await page.getByRole('link',{name:'Cart with 1 domains'}).click();
  await expect(page.getByRole('heading',{name:'test-cubixtop-example.com'})).toBeVisible();

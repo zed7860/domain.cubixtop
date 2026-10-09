@@ -80,6 +80,11 @@ h1,h2,h3{font-weight:800;text-wrap:balance}
 .navigation-dialog nav span{font-size:clamp(26px,4.5vw,52px);letter-spacing:-.04em;line-height:1.2}
 .navigation-dialog nav a:hover,.navigation-dialog nav a[aria-current="page"]{color:#ff9954}
 .navigation-footer{display:flex;justify-content:space-between;align-items:center;gap:24px;border-top:1px solid #ffffff20;padding-top:20px;color:#c0cabf;font-size:14px}
+.navigation-tools{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:0 0 24px;color:#fff}
+.navigation-tools .theme-toggle,.navigation-tools .btn2{background:#ffffff0c;border-color:#ffffff30;color:#fff}
+.navigation-tools .theme-toggle:hover,.navigation-tools .btn2:hover{background:#ffffff18;color:#ff9954}
+@media(max-width:1100px){.site-header .nav{flex-wrap:nowrap;justify-content:space-between;gap:16px}.site-header .links{flex-wrap:nowrap;gap:16px}}
+@media(max-width:380px){.site-header .brand img{width:120px}.site-header .links{gap:10px}.hamburger-control>span:first-child{display:none}}
 .hero{background:radial-gradient(ellipse at 80% 30%,#39543c80,transparent 55%),linear-gradient(125deg,#12221b,#1c3425);color:#f4f4ef;border-bottom:0}
 .hero h1{font-weight:500;letter-spacing:-.055em}
 .hero h1 span{color:#ff9954}
