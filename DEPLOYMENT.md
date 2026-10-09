@@ -24,7 +24,7 @@ Existing SQLite records are not automatically imported into a new Supabase schem
 
 Run `npm run check:deployment`, `npm run typecheck`, `npm run build` and `npm test`. PostgreSQL tests exercise real PostgreSQL SQL semantics, login, profiles, orders and admin pages against an isolated engine. Merchant tests use fixtures and do not purchase domains or make real charges.
 
-Missing DATABASE_URL produces SUPABASE_CONNECTION_MISSING. Missing first-administrator credentials produce ADMIN_BOOTSTRAP_MISSING. For invalid credentials, certificate errors or connection timeouts, inspect Vercel runtime logs following Authentication service initialization failed. PostgreSQL certificates are verified; the code does not disable TLS checks. Login does not require the merchant-settings encryption key, but encrypted integration settings do.
+Missing DATABASE_URL produces SUPABASE_CONNECTION_MISSING. Missing first-administrator credentials produce ADMIN_BOOTSTRAP_MISSING. For invalid credentials, certificate errors or connection timeouts, inspect Vercel runtime logs following Authentication service initialization failed. The Supabase pooler connection uses encrypted `ssl=require` semantics; certificate-chain verification requires separately installing the project's CA certificate. Login does not require the merchant-settings encryption key, but encrypted integration settings do.
 
 Use a separate database for preview deployments. Configure payment callbacks and verify sandbox payment-to-registration behavior before enabling production merchants. DATA_DIRECTORY=/tmp is not persistent hosted storage.
 

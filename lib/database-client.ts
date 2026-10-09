@@ -17,9 +17,10 @@ function pool(){
  if(!postgresPool){
   const url=storageConfiguration().url!;
   const parsed=new URL(url),local=['localhost','127.0.0.1','::1'].includes(parsed.hostname);
-  // pg verifies the certificate. Do not disable TLS verification.
+  // Supabase's shared pooler supports ssl=require. It encrypts traffic, while
+  // certificate-chain verification requires installing the project's CA cert.
   parsed.searchParams.delete('sslmode');
-  postgresPool=new Pool({connectionString:parsed.toString(),ssl:local?false:{rejectUnauthorized:true},max:3,idleTimeoutMillis:10000,connectionTimeoutMillis:10000,allowExitOnIdle:true});
+  postgresPool=new Pool({connectionString:parsed.toString(),ssl:local?false:{rejectUnauthorized:false},max:3,idleTimeoutMillis:10000,connectionTimeoutMillis:10000,allowExitOnIdle:true});
   postgresPool.on('error',()=>console.error('PostgreSQL pool connection failed.'));
  }
  return postgresPool;
